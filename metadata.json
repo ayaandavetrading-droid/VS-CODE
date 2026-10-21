@@ -1,0 +1,6 @@
+{
+  "name": "CodeReplay Studio",
+  "description": "Realistic VS Code Coding Simulator with progressive typing replay, multi-file workspace, playback controls, and project export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

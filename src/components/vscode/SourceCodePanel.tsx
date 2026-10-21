@@ -6,9 +6,9 @@ import {
   Trash2, 
   Sparkles, 
   Check, 
-  AlertCircle,
-  Copy,
-  ChevronDown
+  Copy, 
+  ChevronDown,
+  Maximize2
 } from 'lucide-react';
 import { SUPPORTED_LANGUAGES, getLanguageById } from '../../utils/languageMap';
 import { SAMPLE_SNIPPETS, SampleSnippet } from '../../utils/sampleSnippets';
@@ -25,6 +25,7 @@ interface SourceCodePanelProps {
   onConfirmClearRequest: () => void;
   isLoaded: boolean;
   totalCharacters: number;
+  onEnterFocusMode: () => void;
 }
 
 export const SourceCodePanel: React.FC<SourceCodePanelProps> = ({
@@ -39,6 +40,7 @@ export const SourceCodePanel: React.FC<SourceCodePanelProps> = ({
   onConfirmClearRequest,
   isLoaded,
   totalCharacters,
+  onEnterFocusMode,
 }) => {
   const [showSampleDropdown, setShowSampleDropdown] = useState(false);
   const [copiedNotification, setCopiedNotification] = useState(false);
@@ -92,7 +94,7 @@ export const SourceCodePanel: React.FC<SourceCodePanelProps> = ({
           <button
             onClick={onHideSource}
             title="Hide Source Panel (keeps code in memory for replay)"
-            className="flex items-center gap-1 px-2 py-1 rounded bg-[#2b2b2b] hover:bg-[#383838] text-[#cccccc] hover:text-white transition-colors text-xs"
+            className="flex items-center gap-1 px-2 py-1 rounded bg-[#2b2b2b] hover:bg-[#383838] text-[#cccccc] hover:text-white transition-colors text-xs cursor-pointer"
           >
             <EyeOff className="w-3.5 h-3.5 text-[#9da5b4]" />
             <span>Hide Source</span>
@@ -111,7 +113,7 @@ export const SourceCodePanel: React.FC<SourceCodePanelProps> = ({
             <select
               value={selectedLanguageId}
               onChange={handleLanguageChange}
-              className="w-full bg-[#252526] text-[#cccccc] border border-[#3c3c3c] rounded px-2 py-1.5 text-xs outline-none focus:border-[#007acc] transition-colors"
+              className="w-full bg-[#252526] text-[#cccccc] border border-[#3c3c3c] rounded px-2 py-1.5 text-xs outline-none focus:border-[#007acc] transition-colors cursor-pointer"
             >
               {SUPPORTED_LANGUAGES.map((lang) => (
                 <option key={lang.id} value={lang.id}>
@@ -151,11 +153,21 @@ export const SourceCodePanel: React.FC<SourceCodePanelProps> = ({
             <span>Load Code</span>
           </button>
 
+          {/* Enter Focus Mode Button */}
+          <button
+            onClick={onEnterFocusMode}
+            title="Switch directly to distraction-free Clean Editor Mode"
+            className="py-1.5 px-2.5 bg-[#25382b] hover:bg-[#2d4735] text-[#89d185] border border-[#3b5e43] rounded text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span>Focus Mode</span>
+          </button>
+
           {/* Sample Snippet Selector */}
           <div className="relative">
             <button
               onClick={() => setShowSampleDropdown(!showSampleDropdown)}
-              className="py-1.5 px-2.5 bg-[#2a2d2e] hover:bg-[#373a3c] text-[#cccccc] border border-[#3c3c3c] rounded text-xs flex items-center gap-1 transition-colors"
+              className="py-1.5 px-2.5 bg-[#2a2d2e] hover:bg-[#373a3c] text-[#cccccc] border border-[#3c3c3c] rounded text-xs flex items-center gap-1 transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>Sample</span>
@@ -174,7 +186,7 @@ export const SourceCodePanel: React.FC<SourceCodePanelProps> = ({
                   <button
                     key={sample.title}
                     onClick={() => handleApplySample(sample)}
-                    className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex flex-col gap-0.5 transition-colors"
+                    className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex flex-col gap-0.5 transition-colors cursor-pointer"
                   >
                     <span className="font-medium text-xs text-[#e1e1e1]">{sample.title}</span>
                     <span className="text-[10px] text-[#858585] truncate">{sample.description}</span>
@@ -191,7 +203,7 @@ export const SourceCodePanel: React.FC<SourceCodePanelProps> = ({
             title="Clear Source Code (requires confirmation)"
             className={`p-1.5 rounded border border-[#3c3c3c] text-xs transition-colors ${
               sourceText 
-                ? 'bg-[#2a2d2e] hover:bg-red-950 hover:text-red-300 hover:border-red-800 text-[#cccccc]' 
+                ? 'bg-[#2a2d2e] hover:bg-red-950 hover:text-red-300 hover:border-red-800 text-[#cccccc] cursor-pointer' 
                 : 'bg-[#222222] text-[#555555] cursor-not-allowed'
             }`}
           >

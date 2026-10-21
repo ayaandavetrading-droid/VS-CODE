@@ -10,12 +10,12 @@ import { StatusBar } from './components/vscode/StatusBar';
 import { CommandPalette } from './components/vscode/CommandPalette';
 import { ClearConfirmModal } from './components/vscode/ClearConfirmModal';
 import { useReplayEngine } from './hooks/useReplayEngine';
-import { WorkspaceProject, WorkspaceFile, LogEntry, SyntaxProblem } from './types';
+import { WorkspaceProject, WorkspaceFile, LogEntry, PanelLayoutConfig, ReplaySpeedPreset } from './types';
 import { SAMPLE_SNIPPETS } from './utils/sampleSnippets';
 import { detectLanguageFromFilename, getLanguageById } from './utils/languageMap';
 import { downloadFile, exportProjectAsZip } from './services/zipService';
 
-const STORAGE_KEY = 'codereplay_workspace_projects_v1';
+const STORAGE_KEY = 'codereplay_workspace_projects_v2';
 
 export default function App() {
   // Initialize default project and sample files
@@ -98,7 +98,7 @@ export default function App() {
     return activeProject?.files.find((f) => f.id === activeProject.activeFileId) || activeProject?.files[0];
   }, [activeProject]);
 
-  // Open tabs
+  // Open tabs tracking
   const [openFileIds, setOpenFileIds] = useState<string[]>([activeFile?.id || '']);
 
   // Ensure activeFile is in openFileIds
@@ -112,10 +112,24 @@ export default function App() {
     return activeProject?.files.filter((f) => openFileIds.includes(f.id)) || [];
   }, [activeProject, openFileIds]);
 
-  // UI Panels state
+  const closedFiles = useMemo(() => {
+    return activeProject?.files.filter((f) => !openFileIds.includes(f.id)) || [];
+  }, [activeProject, openFileIds]);
+
+  // Clean Editor & Layout panel visibility configuration
+  const [layoutConfig, setLayoutConfig] = useState<PanelLayoutConfig>({
+    showActivityBar: true,
+    showSidebar: true,
+    showSourcePanel: true,
+    showBottomPanel: true,
+    showPlaybackBar: true,
+    showStatusBar: true,
+  });
+
+  const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
+  const [savedLayoutConfig, setSavedLayoutConfig] = useState<PanelLayoutConfig | null>(null);
+
   const [sidebarView, setSidebarView] = useState<SidebarView>('explorer');
-  const [isSourcePanelVisible, setIsSourcePanelVisible] = useState<boolean>(true);
-  const [isBottomPanelOpen, setIsBottomPanelOpen] = useState<boolean>(true);
   const [bottomTab, setBottomTab] = useState<BottomTab>('terminal');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState<boolean>(false);
@@ -125,19 +139,19 @@ export default function App() {
   const [inputFilename, setInputFilename] = useState<string>(activeFile?.name || 'main.py');
   const [inputLanguageId, setInputLanguageId] = useState<string>(activeFile?.language || 'python');
 
-  // Logs and problems
+  // Logs
   const [logs, setLogs] = useState<LogEntry[]>([
     {
       id: 'log-init',
       timestamp: new Date().toLocaleTimeString(),
       type: 'system',
-      message: 'CodeReplay Studio runtime initialized. Ready to simulate typing.',
+      message: 'CodeReplay Studio runtime initialized with Ultra-Slow Replay engine.',
     },
     {
       id: 'log-welcome',
       timestamp: new Date().toLocaleTimeString(),
       type: 'info',
-      message: `Loaded workspace "${activeProject.name}" with ${activeProject.files.length} files.`,
+      message: `Default preset: Very Slow (150ms/char). Loaded workspace "${activeProject.name}".`,
     }
   ]);
 
@@ -149,7 +163,28 @@ export default function App() {
       message,
       details,
     };
-    setLogs((prev) => [...prev.slice(-100), entry]); // keep last 100 logs
+    setLogs((prev) => [...prev.slice(-100), entry]);
+  }, []);
+
+  // Sync file offsets from engine without cross-file contamination
+  const handleEngineOffsetChange = useCallback((fileId: string, newOffset: number, newStatus: any) => {
+    setProjects((prev) =>
+      prev.map((proj) => {
+        if (!proj.files.some((f) => f.id === fileId)) return proj;
+        return {
+          ...proj,
+          files: proj.files.map((f) => {
+            if (f.id !== fileId) return f;
+            return {
+              ...f,
+              currentOffset: newOffset,
+              status: newStatus,
+              updatedAt: Date.now(),
+            };
+          }),
+        };
+      })
+    );
   }, []);
 
   // Replay Engine integration
@@ -172,37 +207,25 @@ export default function App() {
     toggleCadence,
     loadSource,
   } = useReplayEngine({
+    fileId: activeFile?.id || '',
     sourceCode: activeFile?.sourceCode || '',
     filename: activeFile?.name || 'unnamed',
+    initialOffset: activeFile?.currentOffset || 0,
+    initialStatus: activeFile?.status || 'idle',
     onLog: addLog,
+    onOffsetChange: handleEngineOffsetChange,
   });
 
-  // Sync replay engine offset back into active file state
-  useEffect(() => {
-    if (!activeFile) return;
-    setProjects((prev) =>
-      prev.map((proj) => {
-        if (proj.id !== activeProject.id) return proj;
-        return {
-          ...proj,
-          files: proj.files.map((f) => {
-            if (f.id !== activeFile.id) return f;
-            return {
-              ...f,
-              currentOffset,
-              status,
-              updatedAt: Date.now(),
-            };
-          }),
-        };
-      })
-    );
-  }, [currentOffset, status, activeFile?.id, activeProject.id]);
-
-  // When switching files, update source panel fields to match selected file
+  // When switching files, update source panel fields and prevent cross-file typing
   const handleSelectFile = useCallback((fileId: string) => {
     const target = activeProject.files.find((f) => f.id === fileId);
     if (!target) return;
+
+    // If currently playing, pause before switching to protect target file integrity
+    if (status === 'playing') {
+      pause();
+      addLog(`Paused replay to switch tabs safely to "${target.name}".`, 'info');
+    }
 
     setProjects((prev) =>
       prev.map((proj) =>
@@ -217,11 +240,31 @@ export default function App() {
     setInputSourceText(target.sourceCode);
     setInputFilename(target.name);
     setInputLanguageId(target.language);
-    loadSource(target.sourceCode, target.name);
     addLog(`Switched active editor document to "${target.name}".`, 'info');
-  }, [activeProject, openFileIds, loadSource, addLog]);
+  }, [activeProject, openFileIds, status, pause, addLog]);
 
-  // Load code from Source Code panel into the active file
+  // Tab Close
+  const handleCloseTab = useCallback((fileId: string) => {
+    if (openFileIds.length <= 1) {
+      addLog('Cannot close the last open tab.', 'warn');
+      return;
+    }
+    const remaining = openFileIds.filter((id) => id !== fileId);
+    setOpenFileIds(remaining);
+    if (activeFile?.id === fileId) {
+      handleSelectFile(remaining[0]);
+    }
+  }, [openFileIds, activeFile?.id, handleSelectFile, addLog]);
+
+  // Tab Reopen
+  const handleReopenFile = useCallback((fileId: string) => {
+    if (!openFileIds.includes(fileId)) {
+      setOpenFileIds((prev) => [...prev, fileId]);
+    }
+    handleSelectFile(fileId);
+  }, [openFileIds, handleSelectFile]);
+
+  // Load code from Source Code panel into active file
   const handleLoadCode = useCallback(() => {
     if (!activeFile) return;
 
@@ -368,7 +411,6 @@ export default function App() {
 
   // Quick load sample snippet
   const handleQuickLoadSample = useCallback(() => {
-    // Cycle to next sample snippet or choose TypeScript/Python
     const nextIndex = (SAMPLE_SNIPPETS.findIndex((s) => s.filename === activeFile?.name) + 1) % SAMPLE_SNIPPETS.length;
     const sample = SAMPLE_SNIPPETS[nextIndex];
 
@@ -401,6 +443,50 @@ export default function App() {
     }
   }, [activeFile, activeProject.id, loadSource, addLog]);
 
+  // Clean Editor / Focus Mode Toggle
+  const handleToggleFocusMode = useCallback(() => {
+    if (!isFocusMode) {
+      // Save current layout arrangement
+      setSavedLayoutConfig({ ...layoutConfig });
+      // Enter clean distraction-free mode
+      setLayoutConfig({
+        showActivityBar: false,
+        showSidebar: false,
+        showSourcePanel: false,
+        showBottomPanel: false,
+        showPlaybackBar: true, // Keep clean controls
+        showStatusBar: false,
+      });
+      setIsFocusMode(true);
+      addLog('Entered Clean Focus Editor Mode. Surrounding panels hidden.', 'info');
+    } else {
+      // Restore previous layout
+      if (savedLayoutConfig) {
+        setLayoutConfig(savedLayoutConfig);
+      } else {
+        setLayoutConfig({
+          showActivityBar: true,
+          showSidebar: true,
+          showSourcePanel: true,
+          showBottomPanel: true,
+          showPlaybackBar: true,
+          showStatusBar: true,
+        });
+      }
+      setIsFocusMode(false);
+      addLog('Restored previous panel layout arrangement.', 'info');
+    }
+  }, [isFocusMode, layoutConfig, savedLayoutConfig, addLog]);
+
+  // Toggle individual panels
+  const handleTogglePanel = useCallback((panelKey: keyof PanelLayoutConfig) => {
+    setLayoutConfig((prev) => {
+      const next = { ...prev, [panelKey]: !prev[panelKey] };
+      addLog(`Toggled ${panelKey}: ${next[panelKey] ? 'Visible' : 'Hidden'}`, 'system');
+      return next;
+    });
+  }, [addLog]);
+
   // Export current project as ZIP
   const handleExportZip = useCallback(() => {
     exportProjectAsZip(activeProject)
@@ -428,10 +514,16 @@ export default function App() {
 
     switch (action.toLowerCase()) {
       case 'help':
-        addLog('Available commands: status, start, pause, resume, restart, reset, step, finish, speed <preset>, clear, export, ls, cat', 'info');
+        addLog('Available commands: status, start, pause, resume, restart, reset, step, finish, speed <preset>, focus, restore, clear, export, ls, cat', 'info');
         break;
       case 'status':
-        addLog(`Status: ${status} | Chars: ${metrics.currentChars}/${metrics.totalChars} (${metrics.percent.toFixed(1)}%) | Line: ${metrics.currentLine}/${metrics.totalLines}`, 'info');
+        addLog(`Status: ${status} | Speed: ${config.preset} (${config.customMs}ms) | Chars: ${metrics.currentChars}/${metrics.totalChars} (${metrics.percent.toFixed(1)}%) | Line: ${metrics.currentLine}/${metrics.totalLines}`, 'info');
+        break;
+      case 'focus':
+        if (!isFocusMode) handleToggleFocusMode();
+        break;
+      case 'restore':
+        if (isFocusMode) handleToggleFocusMode();
         break;
       case 'start':
         start();
@@ -456,9 +548,9 @@ export default function App() {
         break;
       case 'speed':
         if (args[0]) {
-          setSpeedPreset(args[0] as any);
+          setSpeedPreset(args[0] as ReplaySpeedPreset);
         } else {
-          addLog(`Current speed: ${config.preset} (delay ${config.customMs}ms)`, 'info');
+          addLog(`Current speed: ${config.preset} (${config.customMs}ms/char)`, 'info');
         }
         break;
       case 'clear':
@@ -487,20 +579,37 @@ export default function App() {
         addLog(`bash: command not found: ${action}. Type "help" for a list of commands.`, 'error');
         break;
     }
-  }, [status, metrics, config, start, pause, resume, restart, reset, stepLine, finish, setSpeedPreset, handleExportZip, activeProject.files, addLog]);
+  }, [status, metrics, config, start, pause, resume, restart, reset, stepLine, finish, setSpeedPreset, isFocusMode, handleToggleFocusMode, handleExportZip, activeProject.files, addLog]);
 
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Focus mode toggle: F11
+      if (e.key === 'F11') {
+        e.preventDefault();
+        handleToggleFocusMode();
+      }
+      // Escape key exits focus mode if active
+      else if (e.key === 'Escape') {
+        if (isFocusMode) {
+          e.preventDefault();
+          handleToggleFocusMode();
+        }
+      }
       // Command palette: Ctrl+P / Cmd+P
-      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+      else if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
         e.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
+      }
+      // Toggle sidebar: Ctrl+B / Cmd+B
+      else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        handleTogglePanel('showSidebar');
       }
       // Toggle source panel: Ctrl+S / Cmd+S
       else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        setIsSourcePanelVisible((prev) => !prev);
+        handleTogglePanel('showSourcePanel');
       }
       // Export zip: Ctrl+E / Cmd+E
       else if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
@@ -513,12 +622,12 @@ export default function App() {
         if (status === 'paused') resume();
         else start();
       }
-      // F6: Pause
+      // F6: Pause immediately
       else if (e.key === 'F6') {
         e.preventDefault();
         pause();
       }
-      // F8: Finish
+      // F8: Finish replay
       else if (e.key === 'F8') {
         e.preventDefault();
         finish();
@@ -527,7 +636,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [status, start, pause, resume, finish, handleExportZip]);
+  }, [status, start, pause, resume, finish, handleExportZip, handleToggleFocusMode, handleTogglePanel, isFocusMode]);
 
   // Persist projects to localStorage
   useEffect(() => {
@@ -538,7 +647,6 @@ export default function App() {
     }
   }, [projects]);
 
-  // Active language display name
   const activeLangOption = activeFile ? detectLanguageFromFilename(activeFile.name) : getLanguageById('plaintext');
 
   return (
@@ -553,26 +661,32 @@ export default function App() {
         onFinish={finish}
         onRestart={restart}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-        onToggleSourcePanel={() => setIsSourcePanelVisible(!isSourcePanelVisible)}
-        isSourcePanelVisible={isSourcePanelVisible}
+        onToggleSourcePanel={() => handleTogglePanel('showSourcePanel')}
+        isSourcePanelVisible={layoutConfig.showSourcePanel}
         onExportZip={handleExportZip}
         onQuickLoadSample={handleQuickLoadSample}
+        isFocusMode={isFocusMode}
+        onToggleFocusMode={handleToggleFocusMode}
+        layoutConfig={layoutConfig}
+        onTogglePanel={handleTogglePanel}
       />
 
-      {/* 2. Main Middle Workspace: Activity Bar + Sidebar + Source Panel + Editor */}
+      {/* 2. Main Middle Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Activity Bar */}
-        <ActivityBar
-          activeView={sidebarView}
-          onSelectView={setSidebarView}
-          isSourcePanelVisible={isSourcePanelVisible}
-          onToggleSourcePanel={() => setIsSourcePanelVisible(!isSourcePanelVisible)}
-          onOpenSettings={() => setIsCommandPaletteOpen(true)}
-          fileCount={activeProject.files.length}
-        />
+        {layoutConfig.showActivityBar && (
+          <ActivityBar
+            activeView={sidebarView}
+            onSelectView={setSidebarView}
+            isSourcePanelVisible={layoutConfig.showSourcePanel}
+            onToggleSourcePanel={() => handleTogglePanel('showSourcePanel')}
+            onOpenSettings={() => setIsCommandPaletteOpen(true)}
+            fileCount={activeProject.files.length}
+          />
+        )}
 
         {/* File Explorer Sidebar */}
-        {sidebarView === 'explorer' && (
+        {layoutConfig.showSidebar && sidebarView === 'explorer' && (
           <FileExplorer
             projects={projects}
             currentProjectId={currentProjectId}
@@ -589,7 +703,7 @@ export default function App() {
         )}
 
         {/* Companion Tab View in Sidebar if selected */}
-        {sidebarView === 'companion' && (
+        {layoutConfig.showSidebar && sidebarView === 'companion' && (
           <div className="w-64 bg-[#252526] p-4 text-xs border-r border-[#1e1e1e] flex flex-col gap-3">
             <div className="font-semibold text-white uppercase tracking-wider text-[11px]">
               Desktop Companion
@@ -599,7 +713,7 @@ export default function App() {
             </p>
             <button
               onClick={() => {
-                setIsBottomPanelOpen(true);
+                setLayoutConfig((prev) => ({ ...prev, showBottomPanel: true }));
                 setBottomTab('companion');
               }}
               className="px-3 py-1.5 bg-[#007acc] hover:bg-[#0062a3] text-white rounded text-xs transition-colors"
@@ -610,7 +724,7 @@ export default function App() {
         )}
 
         {/* Dedicated "Source Code" Input Panel */}
-        {isSourcePanelVisible && (
+        {layoutConfig.showSourcePanel && (
           <SourceCodePanel
             sourceText={inputSourceText}
             onSourceTextChange={setInputSourceText}
@@ -619,85 +733,90 @@ export default function App() {
             filename={inputFilename}
             onFilenameChange={setInputFilename}
             onLoadCode={handleLoadCode}
-            onHideSource={() => setIsSourcePanelVisible(false)}
+            onHideSource={() => handleTogglePanel('showSourcePanel')}
             onConfirmClearRequest={() => setIsClearConfirmOpen(true)}
             isLoaded={activeFile?.sourceCode === inputSourceText && inputSourceText.length > 0}
             totalCharacters={inputSourceText.length}
+            onEnterFocusMode={handleToggleFocusMode}
           />
         )}
 
         {/* Center Code Editor Area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Replay Playback & Speed Controls Bar */}
-          <PlaybackBar
-            status={status}
-            config={config}
-            metrics={metrics}
-            onStart={start}
-            onPause={pause}
-            onResume={resume}
-            onRestart={restart}
-            onReset={reset}
-            onStepLine={stepLine}
-            onStepChar={stepChar}
-            onFinish={finish}
-            onSpeedPresetChange={setSpeedPreset}
-            onCustomMsChange={setCustomMs}
-            onToggleCadence={toggleCadence}
-            isSourcePanelVisible={isSourcePanelVisible}
-            onShowSourcePanel={() => setIsSourcePanelVisible(true)}
-            hasSource={Boolean(activeFile?.sourceCode)}
-          />
+          {layoutConfig.showPlaybackBar && (
+            <PlaybackBar
+              status={status}
+              config={config}
+              metrics={metrics}
+              onStart={start}
+              onPause={pause}
+              onResume={resume}
+              onRestart={restart}
+              onReset={reset}
+              onStepLine={stepLine}
+              onStepChar={stepChar}
+              onFinish={finish}
+              onSpeedPresetChange={setSpeedPreset}
+              onCustomMsChange={setCustomMs}
+              onToggleCadence={toggleCadence}
+              isSourcePanelVisible={layoutConfig.showSourcePanel}
+              onShowSourcePanel={() => handleTogglePanel('showSourcePanel')}
+              hasSource={Boolean(activeFile?.sourceCode)}
+              isFocusMode={isFocusMode}
+              onToggleFocusMode={handleToggleFocusMode}
+            />
+          )}
 
           {/* Monaco Editor Canvas */}
           <EditorArea
             project={activeProject}
             activeFile={activeFile}
             openFiles={openFiles}
+            closedFiles={closedFiles}
             onSelectTab={handleSelectFile}
-            onCloseTab={(id) => {
-              const remaining = openFileIds.filter((fid) => fid !== id);
-              if (remaining.length > 0) {
-                setOpenFileIds(remaining);
-                if (activeFile?.id === id) {
-                  handleSelectFile(remaining[0]);
-                }
-              }
-            }}
-            onShowSourcePanel={() => setIsSourcePanelVisible(true)}
+            onCloseTab={handleCloseTab}
+            onReopenFile={handleReopenFile}
+            onShowSourcePanel={() => handleTogglePanel('showSourcePanel')}
             onQuickLoadSample={handleQuickLoadSample}
             onDownloadActiveFile={handleDownloadActiveFile}
             onStartReplay={start}
             replayState={status}
+            isFocusMode={isFocusMode}
+            onToggleFocusMode={handleToggleFocusMode}
           />
 
           {/* Bottom Panel: Terminal, Problems, Output, Companion */}
-          <BottomPanel
-            logs={logs}
-            problems={[]}
-            metrics={metrics}
-            activeFile={activeFile}
-            onClearLogs={() => setLogs([])}
-            isOpen={isBottomPanelOpen}
-            onToggleOpen={() => setIsBottomPanelOpen(!isBottomPanelOpen)}
-            activeTab={bottomTab}
-            onSelectTab={setBottomTab}
-            onRunTerminalCommand={handleRunTerminalCommand}
-          />
+          {layoutConfig.showBottomPanel && (
+            <BottomPanel
+              logs={logs}
+              problems={[]}
+              metrics={metrics}
+              activeFile={activeFile}
+              onClearLogs={() => setLogs([])}
+              isOpen={layoutConfig.showBottomPanel}
+              onToggleOpen={() => handleTogglePanel('showBottomPanel')}
+              activeTab={bottomTab}
+              onSelectTab={setBottomTab}
+              onRunTerminalCommand={handleRunTerminalCommand}
+            />
+          )}
         </div>
       </div>
 
       {/* 3. VS Code Status Bar */}
-      <StatusBar
-        languageName={activeLangOption.name}
-        metrics={metrics}
-        replayState={status}
-        onToggleTerminal={() => {
-          setIsBottomPanelOpen(!isBottomPanelOpen);
-          setBottomTab('problems');
-        }}
-        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-      />
+      {layoutConfig.showStatusBar && (
+        <StatusBar
+          languageName={activeLangOption.name}
+          metrics={metrics}
+          replayState={status}
+          onToggleTerminal={() => {
+            handleTogglePanel('showBottomPanel');
+            setBottomTab('problems');
+          }}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        />
+      )}
 
       {/* Command Palette Modal */}
       <CommandPalette
@@ -712,10 +831,13 @@ export default function App() {
         onReset={reset}
         onStepLine={stepLine}
         onFinish={finish}
-        onToggleSourcePanel={() => setIsSourcePanelVisible(!isSourcePanelVisible)}
-        isSourcePanelVisible={isSourcePanelVisible}
+        onToggleSourcePanel={() => handleTogglePanel('showSourcePanel')}
+        isSourcePanelVisible={layoutConfig.showSourcePanel}
         onExportZip={handleExportZip}
         onQuickLoadSample={handleQuickLoadSample}
+        isFocusMode={isFocusMode}
+        onToggleFocusMode={handleToggleFocusMode}
+        onSetSpeedPreset={setSpeedPreset}
       />
 
       {/* Clear Confirmation Modal */}

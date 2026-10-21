@@ -7,15 +7,15 @@ import {
   FastForward, 
   StepForward, 
   Download, 
-  FileCode, 
   Eye, 
   EyeOff, 
-  Zap, 
-  Sparkles,
-  Command,
-  File
+  Sparkles, 
+  File,
+  Maximize2,
+  Minimize2,
+  Gauge
 } from 'lucide-react';
-import { WorkspaceFile } from '../../types';
+import { WorkspaceFile, ReplaySpeedPreset } from '../../types';
 
 interface CommandItem {
   id: string;
@@ -42,6 +42,9 @@ interface CommandPaletteProps {
   isSourcePanelVisible: boolean;
   onExportZip: () => void;
   onQuickLoadSample: () => void;
+  isFocusMode: boolean;
+  onToggleFocusMode: () => void;
+  onSetSpeedPreset: (preset: ReplaySpeedPreset) => void;
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
@@ -60,6 +63,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   isSourcePanelVisible,
   onExportZip,
   onQuickLoadSample,
+  isFocusMode,
+  onToggleFocusMode,
+  onSetSpeedPreset,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -77,6 +83,14 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   const baseCommands: CommandItem[] = [
     {
+      id: 'toggle-focus',
+      label: isFocusMode ? 'View: Restore Layout (Exit Focus Mode)' : 'View: Focus Editor (Clean Distraction-Free Mode)',
+      category: 'View',
+      icon: isFocusMode ? <Minimize2 className="w-4 h-4 text-emerald-400" /> : <Maximize2 className="w-4 h-4 text-[#4fc1ff]" />,
+      shortcut: 'F11',
+      action: onToggleFocusMode,
+    },
+    {
       id: 'start-replay',
       label: 'Replay: Start from Beginning',
       category: 'Playback',
@@ -86,7 +100,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     },
     {
       id: 'pause-replay',
-      label: 'Replay: Pause',
+      label: 'Replay: Pause Immediately',
       category: 'Playback',
       icon: <Pause className="w-4 h-4 text-amber-400" />,
       shortcut: 'F6',
@@ -119,6 +133,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       label: 'Replay: Restart',
       category: 'Playback',
       icon: <RotateCcw className="w-4 h-4 text-purple-400" />,
+      shortcut: 'Ctrl+R',
       action: onRestart,
     },
     {
@@ -127,6 +142,34 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       category: 'Playback',
       icon: <RotateCcw className="w-4 h-4 text-gray-400" />,
       action: onReset,
+    },
+    {
+      id: 'speed-very-slow',
+      label: 'Speed: Set to Very Slow (150ms/char) - Ultra-Slow Default',
+      category: 'Speed',
+      icon: <Gauge className="w-4 h-4 text-amber-400" />,
+      action: () => onSetSpeedPreset('very_slow'),
+    },
+    {
+      id: 'speed-slow',
+      label: 'Speed: Set to Slow (70ms/char)',
+      category: 'Speed',
+      icon: <Gauge className="w-4 h-4 text-yellow-400" />,
+      action: () => onSetSpeedPreset('slow'),
+    },
+    {
+      id: 'speed-normal',
+      label: 'Speed: Set to Normal (30ms/char)',
+      category: 'Speed',
+      icon: <Gauge className="w-4 h-4 text-blue-400" />,
+      action: () => onSetSpeedPreset('normal'),
+    },
+    {
+      id: 'speed-fast',
+      label: 'Speed: Set to Fast (10ms/char)',
+      category: 'Speed',
+      icon: <Gauge className="w-4 h-4 text-emerald-400" />,
+      action: () => onSetSpeedPreset('fast'),
     },
     {
       id: 'toggle-source',
@@ -153,7 +196,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     },
   ];
 
-  // Add files to quick open list
   const fileCommands: CommandItem[] = files.map((file) => ({
     id: `file-${file.id}`,
     label: `Go to File: ${file.name}`,

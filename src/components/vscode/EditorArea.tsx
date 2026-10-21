@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import { 
   X, 
@@ -8,9 +8,11 @@ import {
   Sparkles, 
   Upload, 
   Code2, 
-  CheckCircle2,
-  Copy,
-  Download
+  CheckCircle2, 
+  Download,
+  Plus,
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
 import { WorkspaceFile, WorkspaceProject, ReplayState } from '../../types';
 import { detectLanguageFromFilename } from '../../utils/languageMap';
@@ -19,28 +21,37 @@ interface EditorAreaProps {
   project: WorkspaceProject;
   activeFile?: WorkspaceFile;
   openFiles: WorkspaceFile[];
+  closedFiles: WorkspaceFile[];
   onSelectTab: (fileId: string) => void;
   onCloseTab: (fileId: string) => void;
+  onReopenFile: (fileId: string) => void;
   onShowSourcePanel: () => void;
   onQuickLoadSample: () => void;
   onDownloadActiveFile: () => void;
   onStartReplay: () => void;
   replayState: ReplayState;
+  isFocusMode: boolean;
+  onToggleFocusMode: () => void;
 }
 
 export const EditorArea: React.FC<EditorAreaProps> = ({
   project,
   activeFile,
   openFiles,
+  closedFiles,
   onSelectTab,
   onCloseTab,
+  onReopenFile,
   onShowSourcePanel,
   onQuickLoadSample,
   onDownloadActiveFile,
   onStartReplay,
   replayState,
+  isFocusMode,
+  onToggleFocusMode,
 }) => {
   const editorRef = useRef<any>(null);
+  const [showReopenDropdown, setShowReopenDropdown] = useState(false);
 
   // Compute text to display: exact slice up to currentOffset
   const displayText = activeFile ? activeFile.sourceCode.slice(0, activeFile.currentOffset) : '';
@@ -64,7 +75,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       renderLineHighlight: 'all',
       bracketPairColorization: { enabled: true },
       guides: { indentation: true, bracketPairs: true },
-      readOnly: false, // Allows viewing & selection; programmatic replay sets value
+      readOnly: false,
     });
   };
 
@@ -72,7 +83,6 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   useEffect(() => {
     if (!editorRef.current || !activeFile) return;
 
-    // Calculate line and column of the tip of the stream
     const lines = displayText.split('\n');
     const lineNumber = lines.length;
     const column = lines[lines.length - 1].length + 1;
@@ -81,14 +91,33 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       editorRef.current.setPosition({ lineNumber, column });
       editorRef.current.revealPositionInCenterIfOutsideViewport({ lineNumber, column });
     } catch (e) {
-      // Editor may be unmounted or resizing
+      // Ignore if editor not ready
     }
   }, [displayText, activeFile?.id]);
 
+  const getFileIconColor = (filename: string) => {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'py': return 'text-yellow-400';
+      case 'ts': case 'tsx': return 'text-blue-400';
+      case 'js': case 'jsx': return 'text-yellow-300';
+      case 'html': return 'text-orange-500';
+      case 'css': return 'text-blue-500';
+      case 'sql': return 'text-emerald-400';
+      case 'java': return 'text-red-400';
+      case 'cs': return 'text-purple-400';
+      case 'rs': return 'text-amber-600';
+      case 'go': return 'text-cyan-400';
+      case 'json': return 'text-yellow-200';
+      case 'md': return 'text-slate-300';
+      default: return 'text-gray-400';
+    }
+  };
+
   return (
-    <div className="flex-1 flex flex-col bg-[#1e1e1e] overflow-hidden select-none">
+    <div className="flex-1 flex flex-col bg-[#1e1e1e] overflow-hidden select-none relative">
       {/* Editor Tab Bar */}
-      <div className="h-9 bg-[#252526] flex items-center justify-between border-b border-[#181818] px-1 overflow-x-auto no-scrollbar">
+      <div className="h-9 bg-[#252526] flex items-center justify-between border-b border-[#181818] px-1 overflow-x-auto no-scrollbar z-10">
         <div className="flex items-center h-full space-x-0.5">
           {openFiles.map((file) => {
             const isActive = activeFile?.id === file.id;
@@ -105,7 +134,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                     : 'bg-[#2d2d2d] hover:bg-[#333333] text-[#969696] border-transparent'
                 }`}
               >
-                <FileCode className={`w-3.5 h-3.5 ${isActive ? 'text-[#4fc1ff]' : 'text-gray-400'}`} />
+                <FileCode className={`w-3.5 h-3.5 shrink-0 ${getFileIconColor(file.name)}`} />
                 <span className="truncate">{file.name}</span>
 
                 {/* Progress or status indicator */}
@@ -124,6 +153,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                       onCloseTab(file.id);
                     }}
                     className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[#404040] rounded text-[#858585] hover:text-white transition-opacity"
+                    title={`Close ${file.name}`}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -131,10 +161,58 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               </div>
             );
           })}
+
+          {/* Reopen Closed Files (+) Dropdown */}
+          {closedFiles.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowReopenDropdown(!showReopenDropdown)}
+                className="p-1.5 hover:bg-[#333333] text-[#858585] hover:text-white rounded transition-colors text-xs"
+                title="Reopen closed files"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+
+              {showReopenDropdown && (
+                <div 
+                  className="absolute left-0 top-full mt-1 w-48 bg-[#252526] border border-[#454545] rounded shadow-2xl py-1 z-50 text-xs"
+                  onMouseLeave={() => setShowReopenDropdown(false)}
+                >
+                  <div className="px-3 py-1 text-[10px] text-[#858585] uppercase tracking-wider font-semibold border-b border-[#333333]">
+                    Reopen File Tab
+                  </div>
+                  {closedFiles.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => {
+                        onReopenFile(f.id);
+                        setShowReopenDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex items-center gap-2"
+                    >
+                      <FileCode className={`w-3.5 h-3.5 ${getFileIconColor(f.name)}`} />
+                      <span className="truncate">{f.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tab bar right actions */}
         <div className="flex items-center gap-1.5 pr-2">
+          {isFocusMode && (
+            <button
+              onClick={onToggleFocusMode}
+              className="px-2 py-0.5 rounded bg-[#2d4a22] hover:bg-[#355628] text-[#89d185] border border-[#4ec9b0]/40 flex items-center gap-1 text-[11px] font-medium transition-colors"
+              title="Exit Focus Mode (Esc or F11)"
+            >
+              <Minimize2 className="w-3 h-3" />
+              <span>Restore Layout</span>
+            </button>
+          )}
+
           {activeFile && (
             <button
               onClick={onDownloadActiveFile}
@@ -149,15 +227,23 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
       {/* Breadcrumb Path Bar */}
       {activeFile && (
-        <div className="h-6 bg-[#1e1e1e] border-b border-[#2d2d2d] px-4 flex items-center gap-1 text-[11px] text-[#858585]">
-          <span>{project.name}</span>
-          <ChevronRight className="w-3 h-3 text-[#555555]" />
-          <span>src</span>
-          <ChevronRight className="w-3 h-3 text-[#555555]" />
-          <span className="text-[#cccccc] font-medium">{activeFile.name}</span>
-          {activeFile.status === 'completed' && (
-            <span className="ml-3 text-[10px] text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Replay Complete
+        <div className="h-6 bg-[#1e1e1e] border-b border-[#2d2d2d] px-4 flex items-center justify-between text-[11px] text-[#858585]">
+          <div className="flex items-center gap-1">
+            <span>{project.name}</span>
+            <ChevronRight className="w-3 h-3 text-[#555555]" />
+            <span>src</span>
+            <ChevronRight className="w-3 h-3 text-[#555555]" />
+            <span className="text-[#cccccc] font-medium">{activeFile.name}</span>
+            {activeFile.status === 'completed' && (
+              <span className="ml-3 text-[10px] text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Replay Complete
+              </span>
+            )}
+          </div>
+
+          {isFocusMode && (
+            <span className="text-[10px] text-[#4ec9b0] font-mono uppercase tracking-wider">
+              [Focus Editor Mode Active]
             </span>
           )}
         </div>

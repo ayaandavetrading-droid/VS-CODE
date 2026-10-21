@@ -10,11 +10,12 @@ import {
   Square, 
   X,
   FileCode,
-  FolderDown,
   Sparkles,
-  Command
+  Maximize2,
+  Minimize2,
+  Check
 } from 'lucide-react';
-import { WorkspaceProject, WorkspaceFile, ReplayState } from '../../types';
+import { WorkspaceProject, WorkspaceFile, ReplayState, PanelLayoutConfig } from '../../types';
 
 interface TitleBarProps {
   project: WorkspaceProject;
@@ -29,6 +30,10 @@ interface TitleBarProps {
   isSourcePanelVisible: boolean;
   onExportZip: () => void;
   onQuickLoadSample: () => void;
+  isFocusMode: boolean;
+  onToggleFocusMode: () => void;
+  layoutConfig: PanelLayoutConfig;
+  onTogglePanel: (panel: keyof PanelLayoutConfig) => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -44,6 +49,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   isSourcePanelVisible,
   onExportZip,
   onQuickLoadSample,
+  isFocusMode,
+  onToggleFocusMode,
+  layoutConfig,
+  onTogglePanel,
 }) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
@@ -74,9 +83,89 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
               {activeMenu === menu && (
                 <div 
-                  className="absolute left-0 top-full mt-1 w-52 bg-[#252526] border border-[#454545] rounded shadow-2xl py-1 z-50 text-[#cccccc]"
+                  className="absolute left-0 top-full mt-1 w-64 bg-[#252526] border border-[#454545] rounded shadow-2xl py-1 z-50 text-[#cccccc]"
                   onMouseLeave={() => setActiveMenu(null)}
                 >
+                  {menu === 'View' && (
+                    <>
+                      <button 
+                        onClick={() => { onToggleFocusMode(); setActiveMenu(null); }}
+                        className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between font-medium text-blue-300"
+                      >
+                        <div className="flex items-center gap-2">
+                          {isFocusMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                          <span>{isFocusMode ? 'Restore Full Layout' : 'Focus Editor (Clean Mode)'}</span>
+                        </div>
+                        <span className="text-[#858585] text-[10px]">F11</span>
+                      </button>
+
+                      <div className="border-t border-[#3c3c3c] my-1" />
+
+                      <button 
+                        onClick={() => { onTogglePanel('showSourcePanel'); setActiveMenu(null); }}
+                        className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          {layoutConfig.showSourcePanel ? <Check className="w-3.5 h-3.5 text-[#007acc]" /> : <span className="w-3.5" />}
+                          <span>Source Code Panel</span>
+                        </div>
+                        <span className="text-[#858585] text-[10px]">Ctrl+S</span>
+                      </button>
+
+                      <button 
+                        onClick={() => { onTogglePanel('showSidebar'); setActiveMenu(null); }}
+                        className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          {layoutConfig.showSidebar ? <Check className="w-3.5 h-3.5 text-[#007acc]" /> : <span className="w-3.5" />}
+                          <span>File Explorer Sidebar</span>
+                        </div>
+                        <span className="text-[#858585] text-[10px]">Ctrl+B</span>
+                      </button>
+
+                      <button 
+                        onClick={() => { onTogglePanel('showActivityBar'); setActiveMenu(null); }}
+                        className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          {layoutConfig.showActivityBar ? <Check className="w-3.5 h-3.5 text-[#007acc]" /> : <span className="w-3.5" />}
+                          <span>Activity Bar</span>
+                        </div>
+                      </button>
+
+                      <button 
+                        onClick={() => { onTogglePanel('showPlaybackBar'); setActiveMenu(null); }}
+                        className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          {layoutConfig.showPlaybackBar ? <Check className="w-3.5 h-3.5 text-[#007acc]" /> : <span className="w-3.5" />}
+                          <span>Replay Controls Bar</span>
+                        </div>
+                      </button>
+
+                      <button 
+                        onClick={() => { onTogglePanel('showBottomPanel'); setActiveMenu(null); }}
+                        className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          {layoutConfig.showBottomPanel ? <Check className="w-3.5 h-3.5 text-[#007acc]" /> : <span className="w-3.5" />}
+                          <span>Bottom Panel (Terminal/Output)</span>
+                        </div>
+                        <span className="text-[#858585] text-[10px]">Ctrl+`</span>
+                      </button>
+
+                      <button 
+                        onClick={() => { onTogglePanel('showStatusBar'); setActiveMenu(null); }}
+                        className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          {layoutConfig.showStatusBar ? <Check className="w-3.5 h-3.5 text-[#007acc]" /> : <span className="w-3.5" />}
+                          <span>Status Bar</span>
+                        </div>
+                      </button>
+                    </>
+                  )}
+
                   {menu === 'File' && (
                     <>
                       <button 
@@ -102,20 +191,21 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                       </button>
                     </>
                   )}
+
                   {menu === 'Run' && (
                     <>
                       <button 
                         onClick={() => { onStart(); setActiveMenu(null); }}
                         className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between"
                       >
-                        <span>Start Replay</span>
+                        <span>Start Replay (Very Slow)</span>
                         <span className="text-[#858585] text-[10px]">F5</span>
                       </button>
                       <button 
                         onClick={() => { onPause(); setActiveMenu(null); }}
                         className="w-full text-left px-3 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between"
                       >
-                        <span>Pause Replay</span>
+                        <span>Pause Replay Immediately</span>
                         <span className="text-[#858585] text-[10px]">F6</span>
                       </button>
                       <button 
@@ -134,9 +224,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                       </button>
                     </>
                   )}
-                  {menu !== 'File' && menu !== 'Run' && (
+
+                  {menu !== 'File' && menu !== 'Run' && menu !== 'View' && (
                     <div className="px-3 py-1.5 text-[#858585] italic text-[11px]">
-                      {menu} shortcuts configured via Command Palette
+                      {menu} options active. Use Command Palette (Ctrl+P) for more.
                     </div>
                   )}
                 </div>
@@ -165,7 +256,30 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       </div>
 
       {/* Right: Quick action buttons & Decorative window controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
+        {/* Dedicated Focus Editor button in Title Bar */}
+        <button
+          onClick={onToggleFocusMode}
+          title={isFocusMode ? 'Restore Full Layout' : 'Focus Editor (Distraction-free mode)'}
+          className={`px-2 py-1 rounded flex items-center gap-1.5 transition-colors text-xs font-medium ${
+            isFocusMode
+              ? 'bg-[#2d4a22] text-[#89d185] hover:bg-[#355628] border border-[#4ec9b0]/50'
+              : 'bg-[#2a2d2e] hover:bg-[#383838] text-[#cccccc] hover:text-white'
+          }`}
+        >
+          {isFocusMode ? (
+            <>
+              <Minimize2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Restore Layout</span>
+            </>
+          ) : (
+            <>
+              <Maximize2 className="w-3.5 h-3.5 text-[#4fc1ff]" />
+              <span className="hidden sm:inline">Focus Editor</span>
+            </>
+          )}
+        </button>
+
         <button
           onClick={onToggleSourcePanel}
           title={isSourcePanelVisible ? 'Hide Source Code Panel' : 'Show Source Code Panel'}
@@ -176,7 +290,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           }`}
         >
           <FileCode className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline font-medium">Source</span>
+          <span className="hidden md:inline font-medium">Source</span>
         </button>
 
         <button
@@ -185,7 +299,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           className="px-2 py-1 rounded bg-[#2b2b2b] hover:bg-[#383838] text-[#cccccc] flex items-center gap-1.5 transition-colors text-xs"
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden md:inline">Sample</span>
+          <span className="hidden lg:inline">Sample</span>
         </button>
 
         {/* Decorative VS Code Window Controls */}

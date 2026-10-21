@@ -56,3 +56,12 @@ export interface ReplayMetrics {
   estimatedRemainingSeconds: number;
   charsPerSecond: number;
 }
+
+export interface PanelLayoutConfig {
+  showActivityBar: boolean;
+  showSidebar: boolean;
+  showSourcePanel: boolean;
+  showBottomPanel: boolean;
+  showPlaybackBar: boolean;
+  showStatusBar: boolean;
+}

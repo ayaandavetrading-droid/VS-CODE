@@ -6,13 +6,13 @@ import {
   FastForward, 
   StepForward, 
   RefreshCw, 
-  Sliders, 
   Clock, 
-  Activity, 
   Eye, 
   ChevronRight,
   Zap,
-  Gauge
+  Gauge,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { ReplayState, ReplaySpeedPreset, ReplayConfig, ReplayMetrics } from '../../types';
 
@@ -34,6 +34,8 @@ interface PlaybackBarProps {
   isSourcePanelVisible: boolean;
   onShowSourcePanel: () => void;
   hasSource: boolean;
+  isFocusMode: boolean;
+  onToggleFocusMode: () => void;
 }
 
 export const PlaybackBar: React.FC<PlaybackBarProps> = ({
@@ -54,11 +56,12 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
   isSourcePanelVisible,
   onShowSourcePanel,
   hasSource,
+  isFocusMode,
+  onToggleFocusMode,
 }) => {
   const isPlaying = status === 'playing';
   const isPaused = status === 'paused';
   const isCompleted = status === 'completed';
-  const isIdle = status === 'idle';
 
   const formatTime = (seconds: number) => {
     if (!isFinite(seconds) || seconds < 0) return '00:00';
@@ -76,7 +79,7 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
           <button
             onClick={onPause}
             className="px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-white font-medium flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
-            title="Pause Replay (F6)"
+            title="Pause Replay Immediately (F6)"
           >
             <Pause className="w-3.5 h-3.5 fill-current" />
             <span>Pause</span>
@@ -182,7 +185,7 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
         </button>
 
         {/* Reveal Source Panel if hidden */}
-        {!isSourcePanelVisible && (
+        {!isSourcePanelVisible && !isFocusMode && (
           <button
             onClick={onShowSourcePanel}
             className="px-2.5 py-1.5 rounded bg-[#1e3a5f] hover:bg-[#254b7d] text-blue-200 border border-blue-500/40 flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -194,8 +197,8 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
         )}
       </div>
 
-      {/* Middle/Right: Speed Selector & Typing Cadence */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Middle/Right: Speed Selector, Cadence, & Clean Focus Mode button */}
+      <div className="flex items-center gap-2.5 flex-wrap">
         {/* Speed presets */}
         <div className="flex items-center gap-1.5 bg-[#181818] px-2 py-1 rounded border border-[#333333]">
           <Gauge className="w-3.5 h-3.5 text-[#007acc]" />
@@ -206,10 +209,10 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
             onChange={(e) => onSpeedPresetChange(e.target.value as ReplaySpeedPreset)}
             className="bg-[#242424] text-[#e0e0e0] text-xs px-2 py-0.5 rounded border border-[#3c3c3c] outline-none cursor-pointer"
           >
-            <option value="very_slow">Very Slow (120ms)</option>
-            <option value="slow">Slow (60ms)</option>
-            <option value="normal">Normal (25ms)</option>
-            <option value="fast">Fast (8ms)</option>
+            <option value="very_slow">Very Slow (150ms)</option>
+            <option value="slow">Slow (70ms)</option>
+            <option value="normal">Normal (30ms)</option>
+            <option value="fast">Fast (10ms)</option>
             <option value="turbo">Turbo (Instant)</option>
             <option value="custom">Custom ms</option>
           </select>
@@ -219,9 +222,9 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
               <input
                 type="number"
                 min="1"
-                max="1000"
+                max="2000"
                 value={config.customMs}
-                onChange={(e) => onCustomMsChange(Math.max(1, parseInt(e.target.value) || 10))}
+                onChange={(e) => onCustomMsChange(Math.max(1, parseInt(e.target.value) || 150))}
                 className="w-14 bg-[#252526] text-white border border-[#007acc] rounded px-1.5 py-0.5 text-xs text-center font-mono outline-none"
               />
               <span className="text-[10px] text-[#858585]">ms</span>
@@ -232,7 +235,7 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
         {/* Natural Cadence Switch */}
         <button
           onClick={onToggleCadence}
-          title="Simulate realistic human typing rhythm (slight pauses at newlines, brackets, punctuation)"
+          title="Simulate realistic human typing rhythm (natural pauses at newlines and punctuation)"
           className={`flex items-center gap-1.5 px-2 py-1 rounded border text-xs transition-colors cursor-pointer ${
             config.naturalCadence
               ? 'bg-[#0e3b5e] border-[#007acc] text-[#80d4ff]'
@@ -242,11 +245,34 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
           <Zap className={`w-3 h-3 ${config.naturalCadence ? 'text-amber-400' : 'text-gray-500'}`} />
           <span className="hidden md:inline">Human Cadence</span>
         </button>
+
+        {/* Clean Editor / Focus Mode Button */}
+        <button
+          onClick={onToggleFocusMode}
+          title={isFocusMode ? 'Restore previous layout arrangement' : 'Enter clean, distraction-free Focus Editor mode'}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded font-medium text-xs border transition-colors cursor-pointer ${
+            isFocusMode
+              ? 'bg-[#2d4a22] text-[#89d185] border-[#4ec9b0]/60 hover:bg-[#355628]'
+              : 'bg-[#2a2d2e] hover:bg-[#373a3c] text-white border-[#3c3c3c]'
+          }`}
+        >
+          {isFocusMode ? (
+            <>
+              <Minimize2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Restore Layout</span>
+            </>
+          ) : (
+            <>
+              <Maximize2 className="w-3.5 h-3.5 text-[#4fc1ff]" />
+              <span>Focus Editor</span>
+            </>
+          )}
+        </button>
       </div>
 
-      {/* Progress metrics bar (Full Width Strip on Mobile, or compact summary) */}
+      {/* Progress metrics bar */}
       <div className="w-full flex items-center justify-between gap-4 pt-1 border-t border-[#2a2a2a] text-[11px] text-[#858585]">
-        {/* Status pill & progress bar */}
+        {/* Status indicator & progress bar */}
         <div className="flex items-center gap-2 flex-1 max-w-sm">
           <span className={`font-mono font-medium uppercase text-[10px] ${
             isPlaying ? 'text-blue-400' : isPaused ? 'text-amber-400' : isCompleted ? 'text-emerald-400' : 'text-gray-400'

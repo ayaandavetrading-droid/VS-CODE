@@ -12,7 +12,9 @@ import {
   Download,
   Plus,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Sliders,
+  RotateCcw
 } from 'lucide-react';
 import { WorkspaceFile, WorkspaceProject, ReplayState } from '../../types';
 import { detectLanguageFromFilename } from '../../utils/languageMap';
@@ -32,6 +34,9 @@ interface EditorAreaProps {
   replayState: ReplayState;
   isFocusMode: boolean;
   onToggleFocusMode: () => void;
+  showPlaybackBar: boolean;
+  onShowControls: () => void;
+  onRestoreLayout: () => void;
 }
 
 export const EditorArea: React.FC<EditorAreaProps> = ({
@@ -49,6 +54,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   replayState,
   isFocusMode,
   onToggleFocusMode,
+  showPlaybackBar,
+  onShowControls,
+  onRestoreLayout,
 }) => {
   const editorRef = useRef<any>(null);
   const [showReopenDropdown, setShowReopenDropdown] = useState(false);
@@ -117,7 +125,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   return (
     <div className="flex-1 flex flex-col bg-[#1e1e1e] overflow-hidden select-none relative">
       {/* Editor Tab Bar */}
-      <div className="h-9 bg-[#252526] flex items-center justify-between border-b border-[#181818] px-1 overflow-x-auto no-scrollbar z-10">
+      <div className="h-9 bg-[#252526] flex items-center justify-between border-b border-[#181818] px-1 overflow-x-auto no-scrollbar z-10 shrink-0">
         <div className="flex items-center h-full space-x-0.5">
           {openFiles.map((file) => {
             const isActive = activeFile?.id === file.id;
@@ -202,6 +210,21 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
         {/* Tab bar right actions */}
         <div className="flex items-center gap-1.5 pr-2">
+          {/* Quick Show Controls Toggle in tab bar when hidden */}
+          {!showPlaybackBar && (
+            <button
+              onClick={onShowControls}
+              className="px-2.5 py-1 rounded bg-[#094771] hover:bg-[#0c598d] text-white flex items-center gap-1.5 text-xs font-medium transition-colors shadow-sm cursor-pointer border border-blue-400/40"
+              title="Reveal Replay Controls (Ctrl+Shift+B)"
+            >
+              <Sliders className="w-3.5 h-3.5 text-blue-300" />
+              <span>Show Controls</span>
+              <kbd className="hidden sm:inline px-1 py-0.2 bg-[#06304d] text-[9px] text-blue-200 rounded">
+                Ctrl+Shift+B
+              </kbd>
+            </button>
+          )}
+
           {isFocusMode && (
             <button
               onClick={onToggleFocusMode}
@@ -227,7 +250,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
       {/* Breadcrumb Path Bar */}
       {activeFile && (
-        <div className="h-6 bg-[#1e1e1e] border-b border-[#2d2d2d] px-4 flex items-center justify-between text-[11px] text-[#858585]">
+        <div className="h-6 bg-[#1e1e1e] border-b border-[#2d2d2d] px-4 flex items-center justify-between text-[11px] text-[#858585] shrink-0">
           <div className="flex items-center gap-1">
             <span>{project.name}</span>
             <ChevronRight className="w-3 h-3 text-[#555555]" />
@@ -241,16 +264,53 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
             )}
           </div>
 
-          {isFocusMode && (
-            <span className="text-[10px] text-[#4ec9b0] font-mono uppercase tracking-wider">
-              [Focus Editor Mode Active]
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {!showPlaybackBar && (
+              <span className="text-[10px] text-blue-400 font-mono hidden sm:inline">
+                Replay Controls Hidden
+              </span>
+            )}
+            {isFocusMode && (
+              <span className="text-[10px] text-[#4ec9b0] font-mono uppercase tracking-wider">
+                [Focus Editor Mode]
+              </span>
+            )}
+          </div>
         </div>
       )}
 
       {/* Main Monaco Editor Display */}
-      <div className="flex-1 relative bg-[#1e1e1e]">
+      <div className="flex-1 relative bg-[#1e1e1e] overflow-hidden">
+        {/* Unobtrusive Floating Handle to Reveal Controls when hidden */}
+        {!showPlaybackBar && activeFile && activeFile.sourceCode.length > 0 && (
+          <div className="absolute top-2 right-6 z-20 flex items-center gap-1.5 bg-[#252526]/95 hover:bg-[#2c2d2e] border border-[#3e3e42] backdrop-blur-md rounded-md px-2.5 py-1 text-xs text-[#cccccc] shadow-2xl transition-all pointer-events-auto">
+            <button
+              onClick={onShowControls}
+              className="flex items-center gap-1.5 text-white hover:text-[#4fc1ff] cursor-pointer"
+              title="Reveal Full Replay Controls Bar (Ctrl+Shift+B)"
+            >
+              <Sliders className="w-3.5 h-3.5 text-[#007acc]" />
+              <span className="font-medium text-[11px]">Show Controls</span>
+              <kbd className="hidden sm:inline px-1 py-0.2 bg-[#1b1b1b] text-[9px] text-[#858585] rounded border border-[#333333]">
+                Ctrl+Shift+B
+              </kbd>
+            </button>
+            {isFocusMode && (
+              <>
+                <span className="text-[#444444] text-[10px]">|</span>
+                <button
+                  onClick={onRestoreLayout}
+                  className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+                  title="Restore Default Full Layout"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span className="hidden md:inline">Restore Layout</span>
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {activeFile && activeFile.sourceCode.length > 0 ? (
           <Editor
             height="100%"
@@ -305,7 +365,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               <span>·</span>
               <span><kbd className="px-1.5 py-0.5 bg-[#252526] rounded border border-[#333333] text-gray-300">F6</kbd> to Pause</span>
               <span>·</span>
-              <span><kbd className="px-1.5 py-0.5 bg-[#252526] rounded border border-[#333333] text-gray-300">F8</kbd> to Finish</span>
+              <span><kbd className="px-1.5 py-0.5 bg-[#252526] rounded border border-[#333333] text-gray-300">Ctrl+Shift+B</kbd> Toggle Controls</span>
             </div>
           </div>
         )}

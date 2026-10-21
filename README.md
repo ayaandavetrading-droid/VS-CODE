@@ -51,6 +51,7 @@
 
 | Shortcut | Action |
 | --- | --- |
+| `Ctrl+Shift+B` / `⌘Shift+B` | **Hide / Reveal Replay Controls Bar** (Smooth, without interrupting replay) |
 | `F11` | Toggle Focus Editor Mode (Clean Presentation) |
 | `Escape` | Restore Layout (Exit Focus Mode) / Close Modals |
 | `F5` | Start Replay / Resume Replay |

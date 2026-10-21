@@ -9,6 +9,7 @@ import {
   Clock, 
   Eye, 
   ChevronRight,
+  ChevronUp,
   Zap,
   Gauge,
   Maximize2,
@@ -36,6 +37,7 @@ interface PlaybackBarProps {
   hasSource: boolean;
   isFocusMode: boolean;
   onToggleFocusMode: () => void;
+  onHideControls: () => void;
 }
 
 export const PlaybackBar: React.FC<PlaybackBarProps> = ({
@@ -58,6 +60,7 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
   hasSource,
   isFocusMode,
   onToggleFocusMode,
+  onHideControls,
 }) => {
   const isPlaying = status === 'playing';
   const isPaused = status === 'paused';
@@ -197,8 +200,8 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
         )}
       </div>
 
-      {/* Middle/Right: Speed Selector, Cadence, & Clean Focus Mode button */}
-      <div className="flex items-center gap-2.5 flex-wrap">
+      {/* Middle/Right: Speed Selector, Cadence, Focus Mode & Hide Controls */}
+      <div className="flex items-center gap-2 flex-wrap">
         {/* Speed presets */}
         <div className="flex items-center gap-1.5 bg-[#181818] px-2 py-1 rounded border border-[#333333]">
           <Gauge className="w-3.5 h-3.5 text-[#007acc]" />
@@ -246,7 +249,7 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
           <span className="hidden md:inline">Human Cadence</span>
         </button>
 
-        {/* Clean Editor / Focus Mode Button */}
+        {/* Focus Mode / Restore Layout Button */}
         <button
           onClick={onToggleFocusMode}
           title={isFocusMode ? 'Restore previous layout arrangement' : 'Enter clean, distraction-free Focus Editor mode'}
@@ -267,6 +270,16 @@ export const PlaybackBar: React.FC<PlaybackBarProps> = ({
               <span>Focus Editor</span>
             </>
           )}
+        </button>
+
+        {/* Dedicated Hide Controls Button */}
+        <button
+          onClick={onHideControls}
+          title="Hide Replay Controls toolbar to maximize editor space (Ctrl+Shift+B)"
+          className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#252526] hover:bg-[#333333] text-[#cccccc] hover:text-white border border-[#3c3c3c] text-xs transition-colors cursor-pointer"
+        >
+          <ChevronUp className="w-3.5 h-3.5 text-[#858585]" />
+          <span className="font-medium">Hide Controls</span>
         </button>
       </div>
 

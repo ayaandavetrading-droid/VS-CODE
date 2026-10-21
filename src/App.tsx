@@ -16,7 +16,7 @@ import { detectLanguageFromFilename, getLanguageById } from './utils/languageMap
 import { downloadFile, exportProjectAsZip } from './services/zipService';
 
 const STORAGE_KEY = 'codereplay_workspace_projects_v2';
-
+const LAYOUT_STORAGE_KEY = 'codereplay_panel_layout_v2';
 export default function App() {
   // Initialize default project and sample files
   const initialProjects: WorkspaceProject[] = useMemo(() => {
@@ -117,13 +117,33 @@ export default function App() {
   }, [activeProject, openFileIds]);
 
   // Clean Editor & Layout panel visibility configuration
-  const [layoutConfig, setLayoutConfig] = useState<PanelLayoutConfig>({
-    showActivityBar: true,
-    showSidebar: true,
-    showSourcePanel: true,
-    showBottomPanel: true,
-    showPlaybackBar: true,
-    showStatusBar: true,
+  const [layoutConfig, setLayoutConfig] = useState<PanelLayoutConfig>(() => {
+    try {
+      const saved = localStorage.getItem(LAYOUT_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            showActivityBar: parsed.showActivityBar !== false,
+            showSidebar: parsed.showSidebar !== false,
+            showSourcePanel: parsed.showSourcePanel !== false,
+            showBottomPanel: parsed.showBottomPanel !== false,
+            showPlaybackBar: parsed.showPlaybackBar !== false,
+            showStatusBar: parsed.showStatusBar !== false,
+          };
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+    return {
+      showActivityBar: true,
+      showSidebar: true,
+      showSourcePanel: true,
+      showBottomPanel: true,
+      showPlaybackBar: true,
+      showStatusBar: true,
+    };
   });
 
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
@@ -478,6 +498,43 @@ export default function App() {
     }
   }, [isFocusMode, layoutConfig, savedLayoutConfig, addLog]);
 
+  // Toggle Replay Control Bar without interrupting playback
+  const handleToggleControls = useCallback(() => {
+    setLayoutConfig((prev) => {
+      const next = !prev.showPlaybackBar;
+      addLog(
+        next 
+          ? 'Replay controls bar revealed.' 
+          : 'Replay controls bar hidden (Ctrl+Shift+B or click "Show Controls" to reveal). Playback continues smoothly.',
+        'system'
+      );
+      return { ...prev, showPlaybackBar: next };
+    });
+  }, [addLog]);
+
+  // Restore Default Full VS Code Layout
+  const handleRestoreDefaultLayout = useCallback(() => {
+    setLayoutConfig({
+      showActivityBar: true,
+      showSidebar: true,
+      showSourcePanel: true,
+      showBottomPanel: true,
+      showPlaybackBar: true,
+      showStatusBar: true,
+    });
+    setIsFocusMode(false);
+    addLog('Restored default full VS Code layout arrangement.', 'info');
+  }, [addLog]);
+
+  // Persist layoutConfig to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layoutConfig));
+    } catch (e) {
+      // Ignore quota errors
+    }
+  }, [layoutConfig]);
+
   // Toggle individual panels
   const handleTogglePanel = useCallback((panelKey: keyof PanelLayoutConfig) => {
     setLayoutConfig((prev) => {
@@ -514,16 +571,20 @@ export default function App() {
 
     switch (action.toLowerCase()) {
       case 'help':
-        addLog('Available commands: status, start, pause, resume, restart, reset, step, finish, speed <preset>, focus, restore, clear, export, ls, cat', 'info');
+        addLog('Available commands: status, start, pause, resume, restart, reset, step, finish, speed <preset>, controls, focus, restore, clear, export, ls, cat', 'info');
         break;
       case 'status':
-        addLog(`Status: ${status} | Speed: ${config.preset} (${config.customMs}ms) | Chars: ${metrics.currentChars}/${metrics.totalChars} (${metrics.percent.toFixed(1)}%) | Line: ${metrics.currentLine}/${metrics.totalLines}`, 'info');
+        addLog(`Status: ${status} | Speed: ${config.preset} (${config.customMs}ms) | Controls: ${layoutConfig.showPlaybackBar ? 'Visible' : 'Hidden'} | Chars: ${metrics.currentChars}/${metrics.totalChars} (${metrics.percent.toFixed(1)}%) | Line: ${metrics.currentLine}/${metrics.totalLines}`, 'info');
+        break;
+      case 'controls':
+      case 'togglecontrols':
+        handleToggleControls();
         break;
       case 'focus':
         if (!isFocusMode) handleToggleFocusMode();
         break;
       case 'restore':
-        if (isFocusMode) handleToggleFocusMode();
+        handleRestoreDefaultLayout();
         break;
       case 'start':
         start();
@@ -579,17 +640,22 @@ export default function App() {
         addLog(`bash: command not found: ${action}. Type "help" for a list of commands.`, 'error');
         break;
     }
-  }, [status, metrics, config, start, pause, resume, restart, reset, stepLine, finish, setSpeedPreset, isFocusMode, handleToggleFocusMode, handleExportZip, activeProject.files, addLog]);
+  }, [status, metrics, config, start, pause, resume, restart, reset, stepLine, finish, setSpeedPreset, isFocusMode, handleToggleFocusMode, handleToggleControls, handleRestoreDefaultLayout, handleExportZip, activeProject.files, layoutConfig.showPlaybackBar, addLog]);
 
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle replay controls: Ctrl+Shift+B / Cmd+Shift+B
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'B' || e.key === 'b')) {
+        e.preventDefault();
+        handleToggleControls();
+      }
       // Focus mode toggle: F11
-      if (e.key === 'F11') {
+      else if (e.key === 'F11') {
         e.preventDefault();
         handleToggleFocusMode();
       }
-      // Escape key exits focus mode if active
+      // Escape key exits focus mode or restores controls
       else if (e.key === 'Escape') {
         if (isFocusMode) {
           e.preventDefault();
@@ -601,8 +667,8 @@ export default function App() {
         e.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
       }
-      // Toggle sidebar: Ctrl+B / Cmd+B
-      else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      // Toggle sidebar: Ctrl+B / Cmd+B (without Shift)
+      else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
         handleTogglePanel('showSidebar');
       }
@@ -636,7 +702,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [status, start, pause, resume, finish, handleExportZip, handleToggleFocusMode, handleTogglePanel, isFocusMode]);
+  }, [status, start, pause, resume, finish, handleExportZip, handleToggleFocusMode, handleToggleControls, handleTogglePanel, isFocusMode]);
 
   // Persist projects to localStorage
   useEffect(() => {
@@ -765,6 +831,7 @@ export default function App() {
               hasSource={Boolean(activeFile?.sourceCode)}
               isFocusMode={isFocusMode}
               onToggleFocusMode={handleToggleFocusMode}
+              onHideControls={handleToggleControls}
             />
           )}
 
@@ -784,6 +851,9 @@ export default function App() {
             replayState={status}
             isFocusMode={isFocusMode}
             onToggleFocusMode={handleToggleFocusMode}
+            showPlaybackBar={layoutConfig.showPlaybackBar}
+            onShowControls={handleToggleControls}
+            onRestoreLayout={handleRestoreDefaultLayout}
           />
 
           {/* Bottom Panel: Terminal, Problems, Output, Companion */}
@@ -838,6 +908,9 @@ export default function App() {
         isFocusMode={isFocusMode}
         onToggleFocusMode={handleToggleFocusMode}
         onSetSpeedPreset={setSpeedPreset}
+        showPlaybackBar={layoutConfig.showPlaybackBar}
+        onToggleControls={handleToggleControls}
+        onRestoreDefaultLayout={handleRestoreDefaultLayout}
       />
 
       {/* Clear Confirmation Modal */}

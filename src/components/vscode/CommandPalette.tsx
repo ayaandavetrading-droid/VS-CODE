@@ -13,7 +13,8 @@ import {
   File,
   Maximize2,
   Minimize2,
-  Gauge
+  Gauge,
+  Sliders
 } from 'lucide-react';
 import { WorkspaceFile, ReplaySpeedPreset } from '../../types';
 
@@ -45,6 +46,9 @@ interface CommandPaletteProps {
   isFocusMode: boolean;
   onToggleFocusMode: () => void;
   onSetSpeedPreset: (preset: ReplaySpeedPreset) => void;
+  showPlaybackBar: boolean;
+  onToggleControls: () => void;
+  onRestoreDefaultLayout: () => void;
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
@@ -66,6 +70,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   isFocusMode,
   onToggleFocusMode,
   onSetSpeedPreset,
+  showPlaybackBar,
+  onToggleControls,
+  onRestoreDefaultLayout,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -82,6 +89,21 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   if (!isOpen) return null;
 
   const baseCommands: CommandItem[] = [
+    {
+      id: 'toggle-controls',
+      label: showPlaybackBar ? 'View: Hide Replay Controls Bar' : 'View: Show Replay Controls Bar',
+      category: 'View',
+      icon: <Sliders className="w-4 h-4 text-cyan-400" />,
+      shortcut: 'Ctrl+Shift+B',
+      action: onToggleControls,
+    },
+    {
+      id: 'restore-default-layout',
+      label: 'View: Restore Default Full Layout',
+      category: 'View',
+      icon: <RotateCcw className="w-4 h-4 text-emerald-400" />,
+      action: onRestoreDefaultLayout,
+    },
     {
       id: 'toggle-focus',
       label: isFocusMode ? 'View: Restore Layout (Exit Focus Mode)' : 'View: Focus Editor (Clean Distraction-Free Mode)',

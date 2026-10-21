@@ -141,6 +141,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                           {layoutConfig.showPlaybackBar ? <Check className="w-3.5 h-3.5 text-[#007acc]" /> : <span className="w-3.5" />}
                           <span>Replay Controls Bar</span>
                         </div>
+                        <span className="text-[#858585] text-[10px]">Ctrl+Shift+B</span>
                       </button>
 
                       <button 

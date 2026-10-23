@@ -64,4 +64,15 @@ export interface PanelLayoutConfig {
   showBottomPanel: boolean;
   showPlaybackBar: boolean;
   showStatusBar: boolean;
+  showProgressInfo: boolean;
+}
+
+export interface EditorSettings {
+  fontSize: number;
+  wordWrap: boolean;
+  minimap: boolean;
+  cursorBlinking: 'blink' | 'smooth' | 'phase' | 'solid';
+  cursorStyle: 'line' | 'block' | 'underline';
+  tabSize: number;
+  smoothScrolling: boolean;
 }

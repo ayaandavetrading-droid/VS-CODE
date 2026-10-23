@@ -9,14 +9,19 @@ import { BottomPanel, BottomTab } from './components/vscode/BottomPanel';
 import { StatusBar } from './components/vscode/StatusBar';
 import { CommandPalette } from './components/vscode/CommandPalette';
 import { ClearConfirmModal } from './components/vscode/ClearConfirmModal';
+import { BottomLeftMenu } from './components/vscode/BottomLeftMenu';
+import { WorkspaceSettingsModal } from './components/vscode/WorkspaceSettingsModal';
+import { SourceCodeModal } from './components/vscode/SourceCodeModal';
+import { FileConfigModal } from './components/vscode/FileConfigModal';
 import { useReplayEngine } from './hooks/useReplayEngine';
-import { WorkspaceProject, WorkspaceFile, LogEntry, PanelLayoutConfig, ReplaySpeedPreset } from './types';
+import { WorkspaceProject, WorkspaceFile, LogEntry, PanelLayoutConfig, ReplaySpeedPreset, EditorSettings } from './types';
 import { SAMPLE_SNIPPETS } from './utils/sampleSnippets';
 import { detectLanguageFromFilename, getLanguageById } from './utils/languageMap';
 import { downloadFile, exportProjectAsZip } from './services/zipService';
 
-const STORAGE_KEY = 'codereplay_workspace_projects_v2';
-const LAYOUT_STORAGE_KEY = 'codereplay_panel_layout_v2';
+const STORAGE_KEY = 'deskpilot_workspace_projects_v4';
+const LAYOUT_STORAGE_KEY = 'deskpilot_panel_layout_v4';
+const SETTINGS_STORAGE_KEY = 'deskpilot_editor_settings_v4';
 export default function App() {
   // Initialize default project and sample files
   const initialProjects: WorkspaceProject[] = useMemo(() => {
@@ -116,7 +121,7 @@ export default function App() {
     return activeProject?.files.filter((f) => !openFileIds.includes(f.id)) || [];
   }, [activeProject, openFileIds]);
 
-  // Clean Editor & Layout panel visibility configuration
+  // Clean Editor & Layout panel visibility configuration (Matches VS Code Reference Screenshot)
   const [layoutConfig, setLayoutConfig] = useState<PanelLayoutConfig>(() => {
     try {
       const saved = localStorage.getItem(LAYOUT_STORAGE_KEY);
@@ -125,11 +130,12 @@ export default function App() {
         if (parsed && typeof parsed === 'object') {
           return {
             showActivityBar: parsed.showActivityBar !== false,
-            showSidebar: parsed.showSidebar !== false,
-            showSourcePanel: parsed.showSourcePanel !== false,
-            showBottomPanel: parsed.showBottomPanel !== false,
-            showPlaybackBar: parsed.showPlaybackBar !== false,
+            showSidebar: Boolean(parsed.showSidebar),
+            showSourcePanel: Boolean(parsed.showSourcePanel),
+            showBottomPanel: Boolean(parsed.showBottomPanel),
+            showPlaybackBar: Boolean(parsed.showPlaybackBar),
             showStatusBar: parsed.showStatusBar !== false,
+            showProgressInfo: parsed.showProgressInfo !== false,
           };
         }
       }
@@ -138,16 +144,54 @@ export default function App() {
     }
     return {
       showActivityBar: true,
-      showSidebar: true,
-      showSourcePanel: true,
-      showBottomPanel: true,
-      showPlaybackBar: true,
+      showSidebar: false, // Hidden by default as in reference screenshot
+      showSourcePanel: false, // Clean editor, configured via bottom-left menu modal
+      showBottomPanel: false,
+      showPlaybackBar: false, // Clean editor, accessible via bottom-left menu
       showStatusBar: true,
+      showProgressInfo: true,
     };
   });
 
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
   const [savedLayoutConfig, setSavedLayoutConfig] = useState<PanelLayoutConfig | null>(null);
+
+  // DeskPilot Replay Modal States
+  const [isSourceCodeModalOpen, setIsSourceCodeModalOpen] = useState<boolean>(false);
+  const [isFileConfigModalOpen, setIsFileConfigModalOpen] = useState<boolean>(false);
+
+  // Monaco Editor Workspace Settings
+  const [editorSettings, setEditorSettings] = useState<EditorSettings>(() => {
+    try {
+      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch (e) {
+      // fallback
+    }
+    return {
+      fontSize: 14,
+      wordWrap: true,
+      minimap: true,
+      cursorBlinking: 'smooth',
+      cursorStyle: 'line',
+      tabSize: 2,
+      smoothScrolling: true,
+    };
+  });
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
+
+  const handleUpdateSettings = useCallback((newSettings: Partial<EditorSettings>) => {
+    setEditorSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+      try {
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  }, []);
 
   const [sidebarView, setSidebarView] = useState<SidebarView>('explorer');
   const [bottomTab, setBottomTab] = useState<BottomTab>('terminal');
@@ -463,38 +507,35 @@ export default function App() {
     }
   }, [activeFile, activeProject.id, loadSource, addLog]);
 
-  // Clean Editor / Focus Mode Toggle
+  // Focus Editor Mode Toggle: Hides replay toolbar, setup panels, and progress info to maximize editor
   const handleToggleFocusMode = useCallback(() => {
     if (!isFocusMode) {
       // Save current layout arrangement
       setSavedLayoutConfig({ ...layoutConfig });
-      // Enter clean distraction-free mode
-      setLayoutConfig({
-        showActivityBar: false,
-        showSidebar: false,
+      // Enter Focus Editor Mode: hide replay toolbar, metrics, and source setup panels,
+      // while keeping standard VS Code chrome (tabs, breadcrumbs, line numbers, minimap, status bar)
+      setLayoutConfig((prev) => ({
+        ...prev,
         showSourcePanel: false,
+        showPlaybackBar: false,
+        showProgressInfo: false,
         showBottomPanel: false,
-        showPlaybackBar: true, // Keep clean controls
-        showStatusBar: false,
-      });
+      }));
       setIsFocusMode(true);
-      addLog('Entered Clean Focus Editor Mode. Surrounding panels hidden.', 'info');
+      addLog('Entered Focus Editor Mode: Replay toolbar & setup panels hidden. Editor expanded.', 'info');
     } else {
       // Restore previous layout
       if (savedLayoutConfig) {
         setLayoutConfig(savedLayoutConfig);
       } else {
-        setLayoutConfig({
-          showActivityBar: true,
-          showSidebar: true,
-          showSourcePanel: true,
-          showBottomPanel: true,
+        setLayoutConfig((prev) => ({
+          ...prev,
           showPlaybackBar: true,
-          showStatusBar: true,
-        });
+          showProgressInfo: true,
+        }));
       }
       setIsFocusMode(false);
-      addLog('Restored previous panel layout arrangement.', 'info');
+      addLog('Exited Focus Editor Mode: Replay controls restored.', 'info');
     }
   }, [isFocusMode, layoutConfig, savedLayoutConfig, addLog]);
 
@@ -505,26 +546,52 @@ export default function App() {
       addLog(
         next 
           ? 'Replay controls bar revealed.' 
-          : 'Replay controls bar hidden (Ctrl+Shift+B or click "Show Controls" to reveal). Playback continues smoothly.',
+          : 'Replay controls bar hidden. Playback continues smoothly.',
         'system'
       );
       return { ...prev, showPlaybackBar: next };
     });
   }, [addLog]);
 
-  // Restore Default Full VS Code Layout
+  // Restore Default Authentic VS Code Layout (Matches Reference Screenshot)
   const handleRestoreDefaultLayout = useCallback(() => {
     setLayoutConfig({
       showActivityBar: true,
-      showSidebar: true,
-      showSourcePanel: true,
-      showBottomPanel: true,
-      showPlaybackBar: true,
+      showSidebar: false,
+      showSourcePanel: false,
+      showBottomPanel: false,
+      showPlaybackBar: false,
       showStatusBar: true,
+      showProgressInfo: true,
     });
     setIsFocusMode(false);
-    addLog('Restored default full VS Code layout arrangement.', 'info');
+    addLog('Restored default VS Code workspace layout arrangement.', 'info');
   }, [addLog]);
+
+  // Quick configure filename and language from bottom-left dropdown
+  const handleSaveFileConfig = useCallback((newFilename: string, newLangId: string) => {
+    if (!activeFile) return;
+    setInputFilename(newFilename);
+    setInputLanguageId(newLangId);
+    setProjects((prev) =>
+      prev.map((proj) => {
+        if (proj.id !== activeProject.id) return proj;
+        return {
+          ...proj,
+          files: proj.files.map((f) => {
+            if (f.id !== activeFile.id) return f;
+            return {
+              ...f,
+              name: newFilename,
+              language: newLangId,
+              updatedAt: Date.now(),
+            };
+          }),
+        };
+      })
+    );
+    addLog(`Configured document "${newFilename}" with ${newLangId} syntax highlighting.`, 'success');
+  }, [activeFile, activeProject.id, addLog]);
 
   // Persist layoutConfig to localStorage
   useEffect(() => {
@@ -854,6 +921,7 @@ export default function App() {
             showPlaybackBar={layoutConfig.showPlaybackBar}
             onShowControls={handleToggleControls}
             onRestoreLayout={handleRestoreDefaultLayout}
+            editorSettings={editorSettings}
           />
 
           {/* Bottom Panel: Terminal, Problems, Output, Companion */}
@@ -874,19 +942,96 @@ export default function App() {
         </div>
       </div>
 
-      {/* 3. VS Code Status Bar */}
+      {/* 3. VS Code Status Bar with Bottom-Left Workspace Menu */}
       {layoutConfig.showStatusBar && (
         <StatusBar
           languageName={activeLangOption.name}
           metrics={metrics}
           replayState={status}
+          showProgressInfo={layoutConfig.showProgressInfo}
           onToggleTerminal={() => {
             handleTogglePanel('showBottomPanel');
             setBottomTab('problems');
           }}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          bottomLeftMenuNode={
+            <BottomLeftMenu
+              replayState={status}
+              replayConfig={config}
+              onStart={start}
+              onPause={pause}
+              onResume={resume}
+              onRestart={restart}
+              onReset={reset}
+              onStepLine={stepLine}
+              onStepChar={stepChar}
+              onFinish={finish}
+              onSpeedPresetChange={setSpeedPreset}
+              onToggleCadence={toggleCadence}
+              layoutConfig={layoutConfig}
+              onTogglePanel={handleTogglePanel}
+              isFocusMode={isFocusMode}
+              onToggleFocusMode={handleToggleFocusMode}
+              onRestoreDefaultLayout={handleRestoreDefaultLayout}
+              onOpenSourceCodeModal={() => setIsSourceCodeModalOpen(true)}
+              onOpenFilenameLanguageModal={() => setIsFileConfigModalOpen(true)}
+              onOpenWorkspaceSettings={() => setIsSettingsModalOpen(true)}
+            />
+          }
         />
       )}
+
+      {/* Fallback Bottom-Left Floating Menu Anchor when Status Bar is toggled off */}
+      {!layoutConfig.showStatusBar && (
+        <div className="fixed bottom-2 left-2 z-40 bg-[#252526] border border-[#454545] rounded-md shadow-2xl p-0.5">
+          <BottomLeftMenu
+            replayState={status}
+            replayConfig={config}
+            onStart={start}
+            onPause={pause}
+            onResume={resume}
+            onRestart={restart}
+            onReset={reset}
+            onStepLine={stepLine}
+            onStepChar={stepChar}
+            onFinish={finish}
+            onSpeedPresetChange={setSpeedPreset}
+            onToggleCadence={toggleCadence}
+            layoutConfig={layoutConfig}
+            onTogglePanel={handleTogglePanel}
+            isFocusMode={isFocusMode}
+            onToggleFocusMode={handleToggleFocusMode}
+            onRestoreDefaultLayout={handleRestoreDefaultLayout}
+            onOpenSourceCodeModal={() => setIsSourceCodeModalOpen(true)}
+            onOpenFilenameLanguageModal={() => setIsFileConfigModalOpen(true)}
+            onOpenWorkspaceSettings={() => setIsSettingsModalOpen(true)}
+          />
+        </div>
+      )}
+
+      {/* Source Code Modal */}
+      <SourceCodeModal
+        isOpen={isSourceCodeModalOpen}
+        onClose={() => setIsSourceCodeModalOpen(false)}
+        sourceText={inputSourceText}
+        onSourceTextChange={setInputSourceText}
+        filename={inputFilename}
+        onFilenameChange={setInputFilename}
+        languageId={inputLanguageId}
+        onLanguageChange={setInputLanguageId}
+        onLoadCode={handleLoadCode}
+        onClear={() => setIsClearConfirmOpen(true)}
+        totalCharacters={inputSourceText.length}
+      />
+
+      {/* Filename and Language Configuration Modal */}
+      <FileConfigModal
+        isOpen={isFileConfigModalOpen}
+        onClose={() => setIsFileConfigModalOpen(false)}
+        currentFilename={activeFile?.name || inputFilename}
+        currentLanguageId={activeFile?.language || inputLanguageId}
+        onSave={handleSaveFileConfig}
+      />
 
       {/* Command Palette Modal */}
       <CommandPalette
@@ -911,6 +1056,18 @@ export default function App() {
         showPlaybackBar={layoutConfig.showPlaybackBar}
         onToggleControls={handleToggleControls}
         onRestoreDefaultLayout={handleRestoreDefaultLayout}
+      />
+
+      {/* Workspace Settings Modal */}
+      <WorkspaceSettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        settings={editorSettings}
+        onUpdateSettings={handleUpdateSettings}
+        replayConfig={config}
+        onSpeedPresetChange={setSpeedPreset}
+        onCustomMsChange={setCustomMs}
+        onToggleCadence={toggleCadence}
       />
 
       {/* Clear Confirmation Modal */}

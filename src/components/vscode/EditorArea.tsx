@@ -14,9 +14,12 @@ import {
   Minimize2,
   Maximize2,
   Sliders,
-  RotateCcw
+  RotateCcw,
+  Columns,
+  MoreHorizontal,
+  ChevronDown
 } from 'lucide-react';
-import { WorkspaceFile, WorkspaceProject, ReplayState } from '../../types';
+import { WorkspaceFile, WorkspaceProject, ReplayState, EditorSettings } from '../../types';
 import { detectLanguageFromFilename } from '../../utils/languageMap';
 
 interface EditorAreaProps {
@@ -37,6 +40,7 @@ interface EditorAreaProps {
   showPlaybackBar: boolean;
   onShowControls: () => void;
   onRestoreLayout: () => void;
+  editorSettings?: EditorSettings;
 }
 
 export const EditorArea: React.FC<EditorAreaProps> = ({
@@ -57,6 +61,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   showPlaybackBar,
   onShowControls,
   onRestoreLayout,
+  editorSettings,
 }) => {
   const editorRef = useRef<any>(null);
   const [showReopenDropdown, setShowReopenDropdown] = useState(false);
@@ -71,21 +76,38 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     // Configure editor layout & cursor
     editor.updateOptions({
       fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
-      fontSize: 13,
+      fontSize: editorSettings?.fontSize || 13,
       lineHeight: 20,
-      minimap: { enabled: true, side: 'right', maxColumn: 80 },
+      minimap: { enabled: editorSettings?.minimap ?? true, side: 'right', maxColumn: 80 },
       scrollBeyondLastLine: false,
       automaticLayout: true,
-      cursorBlinking: 'blink',
-      cursorStyle: 'line',
+      cursorBlinking: editorSettings?.cursorBlinking || 'blink',
+      cursorStyle: editorSettings?.cursorStyle || 'line',
       cursorWidth: 2,
-      smoothScrolling: true,
+      smoothScrolling: editorSettings?.smoothScrolling ?? true,
+      wordWrap: editorSettings?.wordWrap ? 'on' : 'off',
+      tabSize: editorSettings?.tabSize || 2,
       renderLineHighlight: 'all',
       bracketPairColorization: { enabled: true },
       guides: { indentation: true, bracketPairs: true },
       readOnly: false,
     });
   };
+
+  // Sync settings when modified from Workspace Settings
+  useEffect(() => {
+    if (editorRef.current && editorSettings) {
+      editorRef.current.updateOptions({
+        fontSize: editorSettings.fontSize,
+        wordWrap: editorSettings.wordWrap ? 'on' : 'off',
+        minimap: { enabled: editorSettings.minimap },
+        cursorBlinking: editorSettings.cursorBlinking,
+        cursorStyle: editorSettings.cursorStyle,
+        tabSize: editorSettings.tabSize,
+        smoothScrolling: editorSettings.smoothScrolling,
+      });
+    }
+  }, [editorSettings]);
 
   // Keep cursor and view locked to current insertion position
   useEffect(() => {
@@ -208,108 +230,72 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
           )}
         </div>
 
-        {/* Tab bar right actions */}
-        <div className="flex items-center gap-1.5 pr-2">
-          {/* Quick Show Controls Toggle in tab bar when hidden */}
-          {!showPlaybackBar && (
-            <button
-              onClick={onShowControls}
-              className="px-2.5 py-1 rounded bg-[#094771] hover:bg-[#0c598d] text-white flex items-center gap-1.5 text-xs font-medium transition-colors shadow-sm cursor-pointer border border-blue-400/40"
-              title="Reveal Replay Controls (Ctrl+Shift+B)"
-            >
-              <Sliders className="w-3.5 h-3.5 text-blue-300" />
-              <span>Show Controls</span>
-              <kbd className="hidden sm:inline px-1 py-0.2 bg-[#06304d] text-[9px] text-blue-200 rounded">
-                Ctrl+Shift+B
-              </kbd>
-            </button>
-          )}
-
-          {isFocusMode && (
-            <button
-              onClick={onToggleFocusMode}
-              className="px-2 py-0.5 rounded bg-[#2d4a22] hover:bg-[#355628] text-[#89d185] border border-[#4ec9b0]/40 flex items-center gap-1 text-[11px] font-medium transition-colors"
-              title="Exit Focus Mode (Esc or F11)"
-            >
-              <Minimize2 className="w-3 h-3" />
-              <span>Restore Layout</span>
-            </button>
-          )}
-
-          {activeFile && (
-            <button
-              onClick={onDownloadActiveFile}
-              title="Download Current File"
-              className="p-1 hover:bg-[#37373d] text-[#858585] hover:text-white rounded transition-colors text-xs"
-            >
-              <Download className="w-3.5 h-3.5" />
-            </button>
-          )}
+        {/* Native VS Code Tab bar right actions */}
+        <div className="flex items-center gap-1 pr-2 text-[#858585] shrink-0">
+          <button 
+            className="p-1 hover:bg-[#333333] hover:text-white rounded transition-colors cursor-pointer"
+            title="Split Editor Right (Ctrl+\)"
+          >
+            <Columns className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            className="p-1 hover:bg-[#333333] hover:text-white rounded transition-colors cursor-pointer"
+            title="More Actions..."
+          >
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
-      {/* Breadcrumb Path Bar */}
+      {/* Breadcrumb Path Bar (Authentic VS Code Layout matching Screenshot) */}
       {activeFile && (
-        <div className="h-6 bg-[#1e1e1e] border-b border-[#2d2d2d] px-4 flex items-center justify-between text-[11px] text-[#858585] shrink-0">
-          <div className="flex items-center gap-1">
-            <span>{project.name}</span>
-            <ChevronRight className="w-3 h-3 text-[#555555]" />
-            <span>src</span>
-            <ChevronRight className="w-3 h-3 text-[#555555]" />
-            <span className="text-[#cccccc] font-medium">{activeFile.name}</span>
-            {activeFile.status === 'completed' && (
-              <span className="ml-3 text-[10px] text-emerald-400 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Replay Complete
-              </span>
+        <div className="h-6 bg-[#181818] border-b border-[#252526] px-3 flex items-center justify-between text-[11px] text-[#858585] shrink-0 font-sans select-none">
+          <div className="flex items-center gap-1 overflow-hidden truncate">
+            <span className="hover:text-white cursor-pointer transition-colors">C:</span>
+            <ChevronRight className="w-3 h-3 text-[#555555] shrink-0" />
+            <span className="hover:text-white cursor-pointer transition-colors">Users</span>
+            <ChevronRight className="w-3 h-3 text-[#555555] shrink-0" />
+            <span className="hover:text-white cursor-pointer transition-colors">adams</span>
+            <ChevronRight className="w-3 h-3 text-[#555555] shrink-0" />
+            <span className="hover:text-white cursor-pointer transition-colors">Downloads</span>
+            <ChevronRight className="w-3 h-3 text-[#555555] shrink-0" />
+            <div className="flex items-center gap-1 text-[#cccccc] font-medium hover:text-white cursor-pointer transition-colors">
+              <FileCode className={`w-3 h-3 ${getFileIconColor(activeFile.name)}`} />
+              <span>{activeFile.name}</span>
+            </div>
+            {activeFile.name.endsWith('.html') && (
+              <>
+                <ChevronRight className="w-3 h-3 text-[#555555] shrink-0" />
+                <span className="text-[#858585] hover:text-[#cccccc] cursor-pointer">&lt;&gt; html</span>
+                <ChevronRight className="w-3 h-3 text-[#555555] shrink-0" />
+                <span className="text-[#858585] hover:text-[#cccccc] cursor-pointer">&lt;&gt; head</span>
+                <ChevronRight className="w-3 h-3 text-[#555555] shrink-0" />
+                <span className="text-[#858585] hover:text-[#cccccc] cursor-pointer">&lt;&gt; style</span>
+                <ChevronRight className="w-3 h-3 text-[#555555] shrink-0" />
+                <span className="text-[#d7ba7d] font-mono">.testi-quote</span>
+              </>
+            )}
+            {activeFile.name.endsWith('.py') && (
+              <>
+                <ChevronRight className="w-3 h-3 text-[#555555] shrink-0" />
+                <span className="text-[#858585] hover:text-[#cccccc] cursor-pointer">class ExpenseTracker</span>
+                <ChevronRight className="w-3 h-3 text-[#555555] shrink-0" />
+                <span className="text-[#4ec9b0] font-mono">def get_summary</span>
+              </>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            {!showPlaybackBar && (
-              <span className="text-[10px] text-blue-400 font-mono hidden sm:inline">
-                Replay Controls Hidden
-              </span>
-            )}
-            {isFocusMode && (
-              <span className="text-[10px] text-[#4ec9b0] font-mono uppercase tracking-wider">
-                [Focus Editor Mode]
-              </span>
-            )}
+          <div className="flex items-center gap-1.5 text-[10px] text-[#717171] shrink-0 pl-2">
+            <span className="hover:text-white cursor-pointer flex items-center gap-0.5">
+              <span>Text Editor</span>
+              <ChevronDown className="w-3 h-3" />
+            </span>
           </div>
         </div>
       )}
 
       {/* Main Monaco Editor Display */}
       <div className="flex-1 relative bg-[#1e1e1e] overflow-hidden">
-        {/* Unobtrusive Floating Handle to Reveal Controls when hidden */}
-        {!showPlaybackBar && activeFile && activeFile.sourceCode.length > 0 && (
-          <div className="absolute top-2 right-6 z-20 flex items-center gap-1.5 bg-[#252526]/95 hover:bg-[#2c2d2e] border border-[#3e3e42] backdrop-blur-md rounded-md px-2.5 py-1 text-xs text-[#cccccc] shadow-2xl transition-all pointer-events-auto">
-            <button
-              onClick={onShowControls}
-              className="flex items-center gap-1.5 text-white hover:text-[#4fc1ff] cursor-pointer"
-              title="Reveal Full Replay Controls Bar (Ctrl+Shift+B)"
-            >
-              <Sliders className="w-3.5 h-3.5 text-[#007acc]" />
-              <span className="font-medium text-[11px]">Show Controls</span>
-              <kbd className="hidden sm:inline px-1 py-0.2 bg-[#1b1b1b] text-[9px] text-[#858585] rounded border border-[#333333]">
-                Ctrl+Shift+B
-              </kbd>
-            </button>
-            {isFocusMode && (
-              <>
-                <span className="text-[#444444] text-[10px]">|</span>
-                <button
-                  onClick={onRestoreLayout}
-                  className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
-                  title="Restore Default Full Layout"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span className="hidden md:inline">Restore Layout</span>
-                </button>
-              </>
-            )}
-          </div>
-        )}
 
         {activeFile && activeFile.sourceCode.length > 0 ? (
           <Editor
@@ -322,12 +308,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               readOnly: true,
               domReadOnly: true,
               fontFamily: "'Fira Code', 'Cascadia Code', monospace",
-              fontSize: 13,
-              minimap: { enabled: true },
+              fontSize: editorSettings?.fontSize || 13,
+              minimap: { enabled: editorSettings?.minimap ?? true },
               automaticLayout: true,
-              wordWrap: 'on',
+              wordWrap: editorSettings?.wordWrap ? 'on' : 'off',
               lineNumbers: 'on',
               renderWhitespace: 'selection',
+              cursorBlinking: editorSettings?.cursorBlinking || 'blink',
+              cursorStyle: editorSettings?.cursorStyle || 'line',
+              tabSize: editorSettings?.tabSize || 2,
+              smoothScrolling: editorSettings?.smoothScrolling ?? true,
             }}
           />
         ) : (

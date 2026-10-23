@@ -8,6 +8,118 @@ export interface SampleSnippet {
 
 export const SAMPLE_SNIPPETS: SampleSnippet[] = [
   {
+    title: 'HTML & CSS: EcoArt Works Studio (Screenshot Reference)',
+    languageId: 'html',
+    filename: 'ecoart-works (1).html',
+    description: 'EcoArt design system with CSS custom properties, grid layouts, cards, and testimonials.',
+    code: `<html lang="en">
+<head>
+<style>
+/* ===== DESIGN SYSTEM & COMPONENTS ===== */
+:root {
+  --sand: #e8c99a;
+  --cream: #fbf7ee;
+  --white: #ffffff;
+  --gold: #d4af37;
+  --ink: #1a1410;
+}
+
+.about-contact-item {
+  background: rgba(232,201,154,.05); border: 1px solid rgba(232,201,154,.1);
+  border-radius: 14px; padding: 18px 20px;
+}
+.aci-icon { font-size: 1.4rem; margin-bottom: 8px; }
+.aci-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .14em; color: var(--sand); opacity: .6; margin-bottom: 4px; }
+.aci-val { font-size: .9rem; color: var(--cream); font-weight: 500; word-break: break-word; }
+
+.services-grid { display: grid; gap: 16px; }
+.service-card {
+  background: rgba(232,201,154,.04); border: 1px solid rgba(232,201,154,.09);
+  border-radius: 18px; padding: 24px 26px;
+  display: flex; align-items: flex-start; gap: 18px;
+  transition: all .3s; cursor: default;
+}
+.service-card:hover { background: rgba(232,201,154,.08); border-color: rgba(181,98,42,.35); transform: translateX(6px); }
+.serv-icon { font-size: 1.8rem; flex-shrink: 0; line-height: 1; }
+.serv-title { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 500; color: var(--sand); margin-bottom: 6px; }
+.serv-desc { font-size: .83rem; color: rgba(232,201,154,.55); line-height: 1.6; }
+
+/* ===== TESTIMONIALS ===== */
+#testimonials { background: var(--cream); }
+.testi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 60px; }
+.testi-card {
+  background: var(--white); border-radius: 20px; padding: 28px;
+  box-shadow: 0 2px 14px rgba(26,20,16,.05);
+  transition: transform .35s, box-shadow .35s;
+}
+.testi-card:hover { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(26,20,16,.1); }
+.testi-stars { color: var(--gold); font-size: 1rem; letter-spacing: 2px; margin-bottom: 16px; }
+.testi-quote {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem; font-style: italic; font-weight: 400;
+  color: var(--ink); line-height: 1.65; margin-bottom: 22px;
+}
+</style>
+</head>
+<body>
+  <div class="testi-card">
+    <div class="testi-stars">★★★★★</div>
+    <div class="testi-quote">
+      "The handcrafted ceramic collection transformed our architectural project."
+    </div>
+  </div>
+</body>
+</html>`,
+  },
+  {
+    title: 'Python: DeskPilot Starter Expense Tracker',
+    languageId: 'python',
+    filename: 'DeskPilot Starter: Python Expense Tracke Untitled-1',
+    description: 'Personal finance analytics CLI with category budgets and CSV reporting.',
+    code: `"""DeskPilot Starter: Python Expense Tracker"""
+from dataclasses import dataclass
+from typing import List, Dict
+import datetime
+
+@dataclass
+class Expense:
+    id: str
+    description: str
+    amount: float
+    category: str
+    date: datetime.date
+
+class ExpenseTracker:
+    def __init__(self, monthly_budget: float = 2500.0):
+        self.budget = monthly_budget
+        self.expenses: List[Expense] = []
+
+    def add_expense(self, description: str, amount: float, category: str = "General") -> Expense:
+        record = Expense(
+            id=f"exp-{len(self.expenses) + 1:04d}",
+            description=description,
+            amount=amount,
+            category=category,
+            date=datetime.date.today()
+        )
+        self.expenses.append(record)
+        return record
+
+    def get_summary(self) -> Dict[str, float]:
+        total = sum(e.amount for e in self.expenses)
+        by_cat: Dict[str, float] = {}
+        for e in self.expenses:
+            by_cat[e.category] = by_cat.get(e.category, 0.0) + e.amount
+        return {"total": total, "remaining": self.budget - total, "by_category": by_cat}
+
+if __name__ == "__main__":
+    tracker = ExpenseTracker()
+    tracker.add_expense("Hosting & Cloud CDN", 45.00, "Infrastructure")
+    tracker.add_expense("VS Code Extension Tooling", 19.99, "Development")
+    print("Summary:", tracker.get_summary())
+`,
+  },
+  {
     title: 'Python: Concurrent Worker Pool & Cache',
     languageId: 'python',
     filename: 'worker_pool.py',

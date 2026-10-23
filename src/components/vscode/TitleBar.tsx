@@ -13,7 +13,13 @@ import {
   Sparkles,
   Maximize2,
   Minimize2,
-  Check
+  Check,
+  ArrowLeft,
+  ArrowRight,
+  PanelLeft,
+  PanelBottom,
+  PanelRight,
+  MessageSquareCode
 } from 'lucide-react';
 import { WorkspaceProject, WorkspaceFile, ReplayState, PanelLayoutConfig } from '../../types';
 
@@ -238,82 +244,95 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         </div>
       </div>
 
-      {/* Center: Command Palette / Title search bar */}
-      <div className="flex-1 max-w-md mx-4">
+      {/* Center: Search & Navigation arrows matching Screenshot */}
+      <div className="flex items-center gap-1.5 flex-1 max-w-lg mx-auto">
+        <button 
+          className="p-1 hover:bg-[#333333] text-[#858585] hover:text-[#cccccc] rounded cursor-pointer transition-colors"
+          title="Go Back (Alt+LeftArrow)"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+        </button>
+        <button 
+          className="p-1 hover:bg-[#333333] text-[#858585] hover:text-[#cccccc] rounded cursor-pointer transition-colors"
+          title="Go Forward (Alt+RightArrow)"
+        >
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+
         <button
           onClick={onOpenCommandPalette}
-          className="w-full h-6 bg-[#2a2d2e] hover:bg-[#323638] text-[#9da5b4] border border-[#3c3c3c] rounded px-3 flex items-center justify-between transition-colors shadow-inner text-xs"
+          className="flex-1 h-6 bg-[#2a2d2e] hover:bg-[#323638] text-[#9da5b4] border border-[#3c3c3c] rounded px-3 flex items-center justify-between transition-colors shadow-inner text-xs cursor-pointer"
         >
           <div className="flex items-center gap-1.5 truncate">
             <Search className="w-3.5 h-3.5 text-[#858585]" />
-            <span className="truncate">
-              {project.name} &mdash; {activeFile ? activeFile.name : 'No file'}
-            </span>
+            <span className="truncate">Search (DeskPilot Workspace)</span>
           </div>
-          <span className="text-[10px] text-[#717171] font-mono bg-[#1e1e1e] px-1.5 py-0.5 rounded border border-[#333333] hidden sm:inline">
-            Ctrl+P / ⌘P
+          <span className="text-[10px] text-[#717171] font-mono bg-[#1e1e1e] px-1.5 py-0.2 rounded border border-[#333333] hidden sm:inline">
+            Ctrl+P
           </span>
         </button>
       </div>
 
-      {/* Right: Quick action buttons & Decorative window controls */}
-      <div className="flex items-center gap-1.5">
-        {/* Dedicated Focus Editor button in Title Bar */}
+      {/* Right: Copilot, Layout controls & Native Window buttons matching Screenshot */}
+      <div className="flex items-center gap-1">
         <button
-          onClick={onToggleFocusMode}
-          title={isFocusMode ? 'Restore Full Layout' : 'Focus Editor (Distraction-free mode)'}
-          className={`px-2 py-1 rounded flex items-center gap-1.5 transition-colors text-xs font-medium ${
-            isFocusMode
-              ? 'bg-[#2d4a22] text-[#89d185] hover:bg-[#355628] border border-[#4ec9b0]/50'
-              : 'bg-[#2a2d2e] hover:bg-[#383838] text-[#cccccc] hover:text-white'
-          }`}
+          onClick={onOpenCommandPalette}
+          title="DeskPilot Copilot Chat"
+          className="p-1.5 hover:bg-[#333333] text-[#858585] hover:text-white rounded transition-colors cursor-pointer"
         >
-          {isFocusMode ? (
-            <>
-              <Minimize2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Restore Layout</span>
-            </>
-          ) : (
-            <>
-              <Maximize2 className="w-3.5 h-3.5 text-[#4fc1ff]" />
-              <span className="hidden sm:inline">Focus Editor</span>
-            </>
-          )}
+          <MessageSquareCode className="w-3.5 h-3.5 text-blue-400" />
         </button>
 
-        <button
-          onClick={onToggleSourcePanel}
-          title={isSourcePanelVisible ? 'Hide Source Code Panel' : 'Show Source Code Panel'}
-          className={`px-2 py-1 rounded flex items-center gap-1.5 transition-colors text-xs ${
-            isSourcePanelVisible 
-              ? 'bg-[#0e639c] text-white hover:bg-[#1177bb]' 
-              : 'bg-[#333333] text-[#cccccc] hover:bg-[#444444]'
-          }`}
-        >
-          <FileCode className="w-3.5 h-3.5" />
-          <span className="hidden md:inline font-medium">Source</span>
-        </button>
+        <div className="flex items-center gap-0.5 border-l border-[#333333] pl-1 ml-1 text-[#858585]">
+          <button
+            onClick={() => onTogglePanel('showSidebar')}
+            title="Toggle Primary Side Bar (Ctrl+B)"
+            className={`p-1 hover:bg-[#333333] rounded transition-colors cursor-pointer ${
+              layoutConfig.showSidebar ? 'text-white' : 'text-[#666666]'
+            }`}
+          >
+            <PanelLeft className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => onTogglePanel('showBottomPanel')}
+            title="Toggle Panel (Ctrl+`)"
+            className={`p-1 hover:bg-[#333333] rounded transition-colors cursor-pointer ${
+              layoutConfig.showBottomPanel ? 'text-white' : 'text-[#666666]'
+            }`}
+          >
+            <PanelBottom className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => onTogglePanel('showSourcePanel')}
+            title="Toggle Secondary Side Bar"
+            className={`p-1 hover:bg-[#333333] rounded transition-colors cursor-pointer ${
+              layoutConfig.showSourcePanel ? 'text-white' : 'text-[#666666]'
+            }`}
+          >
+            <PanelRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
-        <button
-          onClick={onQuickLoadSample}
-          title="Quick Load Code Sample"
-          className="px-2 py-1 rounded bg-[#2b2b2b] hover:bg-[#383838] text-[#cccccc] flex items-center gap-1.5 transition-colors text-xs"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden lg:inline">Sample</span>
-        </button>
-
-        {/* Decorative VS Code Window Controls */}
-        <div className="flex items-center space-x-1 pl-2 border-l border-[#333333]">
-          <div className="w-3 h-3 rounded-full bg-[#f1fa8c]/20 hover:bg-yellow-500/80 cursor-pointer flex items-center justify-center transition-colors">
-            <Minus className="w-2 h-2 text-transparent hover:text-black" />
-          </div>
-          <div className="w-3 h-3 rounded-full bg-[#50fa7b]/20 hover:bg-green-500/80 cursor-pointer flex items-center justify-center transition-colors">
-            <Square className="w-2 h-2 text-transparent hover:text-black" />
-          </div>
-          <div className="w-3 h-3 rounded-full bg-[#ff5555]/20 hover:bg-red-500/80 cursor-pointer flex items-center justify-center transition-colors">
-            <X className="w-2 h-2 text-transparent hover:text-black" />
-          </div>
+        {/* Windows Standard Window Controls */}
+        <div className="flex items-center ml-2 border-l border-[#333333] -mr-2 text-[#cccccc]">
+          <button 
+            className="w-10 h-9 flex items-center justify-center hover:bg-[#333333] transition-colors"
+            title="Minimize"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            className="w-10 h-9 flex items-center justify-center hover:bg-[#333333] transition-colors"
+            title="Maximize"
+          >
+            <Square className="w-3 h-3" />
+          </button>
+          <button 
+            className="w-10 h-9 flex items-center justify-center hover:bg-[#e81123] hover:text-white transition-colors"
+            title="Close"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </div>
